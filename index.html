@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SKUs de Pedidos ML</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #f5f5f5;
+  min-height: 100vh;
+  padding: 32px 24px;
+  color: #222;
+}
+
+.container { max-width: 760px; margin: 0 auto; }
+
+h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 24px;
+  color: #111;
+}
+
+#zona-drop {
+  border: 2px dashed #ccc;
+  border-radius: 10px;
+  padding: 48px 24px;
+  text-align: center;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+#zona-drop:hover,
+#zona-drop.drag-over {
+  border-color: #3483fa;
+  background: #f5f9ff;
+}
+#zona-drop label {
+  cursor: pointer;
+  font-size: 1rem;
+  display: block;
+}
+#zona-drop strong { color: #3483fa; }
+#zona-drop p {
+  color: #888;
+  font-size: 0.85rem;
+  margin-top: 6px;
+}
+#zona-drop input[type=file] { display: none; }
+
+#estado {
+  margin-top: 14px;
+  font-size: 0.875rem;
+  color: #555;
+  min-height: 1.4em;
+  text-align: center;
+}
+
+#resultado {
+  display: none;
+  margin-top: 24px;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+
+.acciones {
+  display: flex;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+button {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  cursor: pointer;
+  font-size: 0.875rem;
+  background: white;
+  transition: background 0.1s;
+}
+button:hover { background: #f5f5f5; }
+button.primary {
+  background: #3483fa;
+  color: white;
+  border-color: #3483fa;
+}
+button.primary:hover { background: #2968c8; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+th {
+  text-align: left;
+  padding: 10px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #e8e8e8;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #666;
+}
+td {
+  padding: 9px 16px;
+  border-bottom: 1px solid #f3f3f3;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: #fafcff; }
+td:last-child, th:last-child { text-align: right; }
+td:last-child { font-weight: 600; }
+td:first-child { font-family: 'Courier New', monospace; font-size: 0.85rem; }
+
+tfoot td {
+  padding: 10px 16px;
+  border-top: 2px solid #e8e8e8;
+  font-weight: 600;
+  color: #555;
+  background: #fafafa;
+}
+tfoot td:last-child { font-size: 1rem; color: #111; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>SKUs de Pedidos ML</h1>
+
+  <div id="zona-drop">
+    <label>
+      <input type="file" id="file-input" accept=".pdf">
+      <strong>Arrastrá el PDF aquí</strong> o hacé click para seleccionarlo
+    </label>
+    <p>Etiquetas FLEX de Mercado Libre</p>
+  </div>
+
+  <div id="estado"></div>
+
+  <div id="resultado">
+    <div class="acciones">
+      <button class="primary" onclick="copiarTabla()">Copiar tabla</button>
+      <button onclick="reiniciar()">Nueva</button>
+    </div>
+    <table id="tabla">
+      <thead>
+        <tr><th>SKU</th><th>Variante</th><th>Cant.</th></tr>
+      </thead>
+      <tbody></tbody>
+      <tfoot></tfoot>
+    </table>
+  </div>
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const zona = document.getElementById('zona-drop');
+const fileInput = document.getElementById('file-input');
+const estadoEl = document.getElementById('estado');
+const resultadoEl = document.getElementById('resultado');
+
+zona.addEventListener('dragover', e => {
+  e.preventDefault();
+  zona.classList.add('drag-over');
+});
+zona.addEventListener('dragleave', () => zona.classList.remove('drag-over'));
+zona.addEventListener('drop', e => {
+  e.preventDefault();
+  zona.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.name.endsWith('.pdf')) procesarArchivo(f);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) procesarArchivo(fileInput.files[0]);
+});
+
+function reiniciar() {
+  resultadoEl.style.display = 'none';
+  estadoEl.textContent = '';
+  fileInput.value = '';
+}
+
+async function procesarArchivo(file) {
+  estadoEl.textContent = 'Leyendo PDF…';
+  resultadoEl.style.display = 'none';
+  try {
+    const filas = await extraerSKUs(file);
+    mostrarTabla(filas);
+  } catch (e) {
+    console.error(e);
+    estadoEl.textContent = 'Error procesando el PDF: ' + e.message;
+  }
+}
+
+async function extraerSKUs(file) {
+  const buffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+
+  const acumulado = new Map(); // "SKU\tVariante" → cantidad total
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    estadoEl.textContent = `Procesando página ${i} de ${pdf.numPages}…`;
+    const pagina = await pdf.getPage(i);
+    const contenido = await pagina.getTextContent();
+    const texto = contenido.items.map(it => it.str).join(' ');
+    parsearPagina(texto, acumulado);
+  }
+
+  return Array.from(acumulado.entries())
+    .map(([clave, cant]) => {
+      const sep = clave.indexOf('\t');
+      return {
+        sku: clave.substring(0, sep),
+        variante: clave.substring(sep + 1),
+        cant
+      };
+    })
+    .sort((a, b) => {
+      const s = a.sku.localeCompare(b.sku);
+      return s !== 0 ? s : a.variante.localeCompare(b.variante);
+    });
+}
+
+function parsearPagina(texto, acumulado) {
+  const matchesSKU = [...texto.matchAll(/SKU:\s*(\S+)/g)];
+  if (matchesSKU.length === 0) return;
+
+  if (/\d+\s*productos/i.test(texto)) {
+    // Pack multi-producto: cada SKU distinto = 1 unidad
+    const vistos = new Set();
+    for (const m of matchesSKU) {
+      if (vistos.has(m[1])) continue;
+      vistos.add(m[1]);
+      registrar(m[1], 1, acumulado);
+    }
+  } else {
+    // Un solo producto con N unidades
+    const mCant = texto.match(/(\d+)\s*[Uu]nidad/);
+    const cant = mCant ? parseInt(mCant[1]) : 1;
+    registrar(matchesSKU[0][1], cant, acumulado);
+  }
+}
+
+function registrar(rawSKU, cantPedido, acumulado) {
+  const { base, variante, packSize } = procesarSKU(rawSKU);
+  const clave = `${base}\t${variante}`;
+  acumulado.set(clave, (acumulado.get(clave) || 0) + cantPedido * packSize);
+}
+
+function procesarSKU(raw) {
+  let basePart, varianteRaw;
+
+  const dot = raw.indexOf('.');
+  if (dot !== -1) {
+    basePart = raw.slice(0, dot);
+    varianteRaw = raw.slice(dot + 1);
+  } else {
+    basePart = raw;
+    varianteRaw = '';
+  }
+
+  // Detectar sufijo de pack en la parte base: P6, P12, P3, etc.
+  let packSize = 1;
+  const pm = basePart.match(/P(\d+)$/);
+  if (pm) {
+    packSize = parseInt(pm[1]);
+    basePart = basePart.slice(0, -pm[0].length);
+  }
+
+  return { base: basePart, variante: formatearVariante(varianteRaw), packSize };
+}
+
+function formatearVariante(raw) {
+  if (!raw) return '';
+  raw = raw.replace(/AR$/i, '');                     // Omitir AR en talles de calzado
+  raw = raw.replace(/([A-Za-z]{2,})(\d)/g, '$1 $2'); // VERDE46 → VERDE 46
+  return raw.trim();
+}
+
+function mostrarTabla(filas) {
+  const tbody = document.querySelector('#tabla tbody');
+  const tfoot = document.querySelector('#tabla tfoot');
+  tbody.innerHTML = '';
+  tfoot.innerHTML = '';
+
+  let totalUnidades = 0;
+
+  for (const { sku, variante, cant } of filas) {
+    const tr = tbody.insertRow();
+    tr.insertCell().textContent = sku;
+    tr.insertCell().textContent = variante;
+    tr.insertCell().textContent = cant;
+    totalUnidades += cant;
+  }
+
+  const tfr = tfoot.insertRow();
+  tfr.insertCell().textContent = filas.length + ' SKUs';
+  tfr.insertCell().textContent = '';
+  tfr.insertCell().textContent = totalUnidades;
+
+  estadoEl.textContent = `Listo: ${filas.length} SKUs, ${totalUnidades} unidades.`;
+  resultadoEl.style.display = 'block';
+}
+
+function copiarTabla() {
+  const filas = [...document.querySelectorAll('#tabla tbody tr')];
+  const lines = ['SKU\tVariante\tCant.'];
+  filas.forEach(tr => {
+    lines.push([...tr.querySelectorAll('td')].map(td => td.textContent).join('\t'));
+  });
+  navigator.clipboard.writeText(lines.join('\n'))
+    .then(() => { estadoEl.textContent = 'Copiado al portapapeles.'; })
+    .catch(() => { estadoEl.textContent = 'No se pudo copiar automáticamente.'; });
+}
+</script>
+</body>
+</html>
