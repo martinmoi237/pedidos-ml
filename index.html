@@ -142,6 +142,7 @@ tfoot td:last-child { font-size: 1rem; color: #111; }
   </div>
 
   <div id="estado"></div>
+  <pre id="debug" style="margin-top:12px;font-size:0.75rem;background:#f0f0f0;padding:10px;border-radius:6px;white-space:pre-wrap;display:block;max-height:200px;overflow:auto;"></pre>
 
   <div id="resultado">
     <div class="acciones">
@@ -211,6 +212,9 @@ async function extraerSKUs(file) {
     const pagina = await pdf.getPage(i);
     const contenido = await pagina.getTextContent();
     const texto = contenido.items.map(it => it.str).join(' ');
+    if (i === 1) {
+      document.getElementById('debug').textContent = 'Texto pág 1:\n' + texto.substring(0, 800);
+    }
     parsearPagina(texto, acumulado);
   }
 
