@@ -126,18 +126,6 @@ tfoot td {
   background: #fafafa;
 }
 tfoot td:last-child { font-size: 1rem; color: #111; }
-
-#debug {
-  margin-top: 12px;
-  font-size: 0.72rem;
-  background: #f0f0f0;
-  padding: 10px;
-  border-radius: 6px;
-  white-space: pre-wrap;
-  max-height: 200px;
-  overflow: auto;
-  display: none;
-}
 </style>
 </head>
 <body>
@@ -153,7 +141,6 @@ tfoot td:last-child { font-size: 1rem; color: #111; }
   </div>
 
   <div id="estado"></div>
-  <pre id="debug"></pre>
 
   <div id="resultado">
     <div class="acciones">
@@ -175,7 +162,6 @@ const zona = document.getElementById('zona-drop');
 const fileInput = document.getElementById('file-input');
 const estadoEl = document.getElementById('estado');
 const resultadoEl = document.getElementById('resultado');
-const debugEl = document.getElementById('debug');
 
 zona.addEventListener('dragover', e => { e.preventDefault(); zona.classList.add('drag-over'); });
 zona.addEventListener('dragleave', () => zona.classList.remove('drag-over'));
@@ -192,103 +178,25 @@ fileInput.addEventListener('change', () => {
 function reiniciar() {
   resultadoEl.style.display = 'none';
   estadoEl.textContent = '';
-  debugEl.style.display = 'none';
-  debugEl.textContent = '';
   fileInput.value = '';
 }
 
 async function procesarArchivo(file) {
-  estadoEl.textContent = 'Enviando PDF…';
+  estadoEl.textContent = 'Analizando PDF con IA… (puede tardar unos segundos)';
   resultadoEl.style.display = 'none';
-  debugEl.style.display = 'none';
   try {
-    const filas = await extraerSKUs(file);
-    mostrarTabla(filas);
+    const formData = new FormData();
+    formData.append('pdf', file);
+
+    const res = await fetch('/api/parsear', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+
+    mostrarTabla(data.filas);
   } catch (e) {
     console.error(e);
     estadoEl.textContent = 'Error: ' + e.message;
   }
-}
-
-async function extraerSKUs(file) {
-  const formData = new FormData();
-  formData.append('pdf', file);
-
-  const res = await fetch('/api/parsear', { method: 'POST', body: formData });
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error);
-
-  // Debug temporal: mostrar primeras 600 chars del texto extraído
-  debugEl.textContent = 'Texto extraído (primeras 600 chars):\n' + data.text.substring(0, 600);
-  debugEl.style.display = 'block';
-
-  const acumulado = new Map();
-  const paginas = data.text.split('\f'); // pdf-parse separa páginas con \f
-  for (const paginaTexto of paginas) {
-    parsearPagina(paginaTexto, acumulado);
-  }
-
-  return Array.from(acumulado.entries())
-    .map(([clave, cant]) => {
-      const sep = clave.indexOf('\t');
-      return { sku: clave.substring(0, sep), variante: clave.substring(sep + 1), cant };
-    })
-    .sort((a, b) => {
-      const s = a.sku.localeCompare(b.sku);
-      return s !== 0 ? s : a.variante.localeCompare(b.variante);
-    });
-}
-
-function parsearPagina(texto, acumulado) {
-  const matchesSKU = [...texto.matchAll(/SKU:\s*(\S+)/g)];
-  if (matchesSKU.length === 0) return;
-
-  if (/\d+\s*productos/i.test(texto)) {
-    const vistos = new Set();
-    for (const m of matchesSKU) {
-      if (vistos.has(m[1])) continue;
-      vistos.add(m[1]);
-      registrar(m[1], 1, acumulado);
-    }
-  } else {
-    const mCant = texto.match(/(\d+)\s*[Uu]nidad/);
-    const cant = mCant ? parseInt(mCant[1]) : 1;
-    registrar(matchesSKU[0][1], cant, acumulado);
-  }
-}
-
-function registrar(rawSKU, cantPedido, acumulado) {
-  const { base, variante, packSize } = procesarSKU(rawSKU);
-  const clave = `${base}\t${variante}`;
-  acumulado.set(clave, (acumulado.get(clave) || 0) + cantPedido * packSize);
-}
-
-function procesarSKU(raw) {
-  let basePart, varianteRaw;
-  const dot = raw.indexOf('.');
-  if (dot !== -1) {
-    basePart = raw.slice(0, dot);
-    varianteRaw = raw.slice(dot + 1);
-  } else {
-    basePart = raw;
-    varianteRaw = '';
-  }
-
-  let packSize = 1;
-  const pm = basePart.match(/P(\d+)$/);
-  if (pm) {
-    packSize = parseInt(pm[1]);
-    basePart = basePart.slice(0, -pm[0].length);
-  }
-
-  return { base: basePart, variante: formatearVariante(varianteRaw), packSize };
-}
-
-function formatearVariante(raw) {
-  if (!raw) return '';
-  raw = raw.replace(/AR$/i, '');
-  raw = raw.replace(/([A-Za-z]{2,})(\d)/g, '$1 $2');
-  return raw.trim();
 }
 
 function mostrarTabla(filas) {

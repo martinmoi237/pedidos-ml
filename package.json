@@ -1,6 +1,6 @@
 {
   "type": "module",
   "dependencies": {
-    "pdf-parse": "^1.1.1"
+    "@anthropic-ai/sdk": "^0.39.0"
   }
 }
