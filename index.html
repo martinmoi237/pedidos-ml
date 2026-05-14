@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SKUs de Pedidos ML</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -127,6 +126,18 @@ tfoot td {
   background: #fafafa;
 }
 tfoot td:last-child { font-size: 1rem; color: #111; }
+
+#debug {
+  margin-top: 12px;
+  font-size: 0.72rem;
+  background: #f0f0f0;
+  padding: 10px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow: auto;
+  display: none;
+}
 </style>
 </head>
 <body>
@@ -142,7 +153,7 @@ tfoot td:last-child { font-size: 1rem; color: #111; }
   </div>
 
   <div id="estado"></div>
-  <pre id="debug" style="margin-top:12px;font-size:0.75rem;background:#f0f0f0;padding:10px;border-radius:6px;white-space:pre-wrap;display:block;max-height:200px;overflow:auto;"></pre>
+  <pre id="debug"></pre>
 
   <div id="resultado">
     <div class="acciones">
@@ -160,18 +171,13 @@ tfoot td:last-child { font-size: 1rem; color: #111; }
 </div>
 
 <script>
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
 const zona = document.getElementById('zona-drop');
 const fileInput = document.getElementById('file-input');
 const estadoEl = document.getElementById('estado');
 const resultadoEl = document.getElementById('resultado');
+const debugEl = document.getElementById('debug');
 
-zona.addEventListener('dragover', e => {
-  e.preventDefault();
-  zona.classList.add('drag-over');
-});
+zona.addEventListener('dragover', e => { e.preventDefault(); zona.classList.add('drag-over'); });
 zona.addEventListener('dragleave', () => zona.classList.remove('drag-over'));
 zona.addEventListener('drop', e => {
   e.preventDefault();
@@ -186,46 +192,46 @@ fileInput.addEventListener('change', () => {
 function reiniciar() {
   resultadoEl.style.display = 'none';
   estadoEl.textContent = '';
+  debugEl.style.display = 'none';
+  debugEl.textContent = '';
   fileInput.value = '';
 }
 
 async function procesarArchivo(file) {
-  estadoEl.textContent = 'Leyendo PDF…';
+  estadoEl.textContent = 'Enviando PDF…';
   resultadoEl.style.display = 'none';
+  debugEl.style.display = 'none';
   try {
     const filas = await extraerSKUs(file);
     mostrarTabla(filas);
   } catch (e) {
     console.error(e);
-    estadoEl.textContent = 'Error procesando el PDF: ' + e.message;
+    estadoEl.textContent = 'Error: ' + e.message;
   }
 }
 
 async function extraerSKUs(file) {
-  const buffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+  const formData = new FormData();
+  formData.append('pdf', file);
 
-  const acumulado = new Map(); // "SKU\tVariante" → cantidad total
+  const res = await fetch('/api/parsear', { method: 'POST', body: formData });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error);
 
-  for (let i = 1; i <= pdf.numPages; i++) {
-    estadoEl.textContent = `Procesando página ${i} de ${pdf.numPages}…`;
-    const pagina = await pdf.getPage(i);
-    const contenido = await pagina.getTextContent();
-    const texto = contenido.items.map(it => it.str).join(' ');
-    if (i === 1) {
-      document.getElementById('debug').textContent = 'Texto pág 1:\n' + texto.substring(0, 800);
-    }
-    parsearPagina(texto, acumulado);
+  // Debug temporal: mostrar primeras 600 chars del texto extraído
+  debugEl.textContent = 'Texto extraído (primeras 600 chars):\n' + data.text.substring(0, 600);
+  debugEl.style.display = 'block';
+
+  const acumulado = new Map();
+  const paginas = data.text.split('\f'); // pdf-parse separa páginas con \f
+  for (const paginaTexto of paginas) {
+    parsearPagina(paginaTexto, acumulado);
   }
 
   return Array.from(acumulado.entries())
     .map(([clave, cant]) => {
       const sep = clave.indexOf('\t');
-      return {
-        sku: clave.substring(0, sep),
-        variante: clave.substring(sep + 1),
-        cant
-      };
+      return { sku: clave.substring(0, sep), variante: clave.substring(sep + 1), cant };
     })
     .sort((a, b) => {
       const s = a.sku.localeCompare(b.sku);
@@ -238,7 +244,6 @@ function parsearPagina(texto, acumulado) {
   if (matchesSKU.length === 0) return;
 
   if (/\d+\s*productos/i.test(texto)) {
-    // Pack multi-producto: cada SKU distinto = 1 unidad
     const vistos = new Set();
     for (const m of matchesSKU) {
       if (vistos.has(m[1])) continue;
@@ -246,7 +251,6 @@ function parsearPagina(texto, acumulado) {
       registrar(m[1], 1, acumulado);
     }
   } else {
-    // Un solo producto con N unidades
     const mCant = texto.match(/(\d+)\s*[Uu]nidad/);
     const cant = mCant ? parseInt(mCant[1]) : 1;
     registrar(matchesSKU[0][1], cant, acumulado);
@@ -261,7 +265,6 @@ function registrar(rawSKU, cantPedido, acumulado) {
 
 function procesarSKU(raw) {
   let basePart, varianteRaw;
-
   const dot = raw.indexOf('.');
   if (dot !== -1) {
     basePart = raw.slice(0, dot);
@@ -271,7 +274,6 @@ function procesarSKU(raw) {
     varianteRaw = '';
   }
 
-  // Detectar sufijo de pack en la parte base: P6, P12, P3, etc.
   let packSize = 1;
   const pm = basePart.match(/P(\d+)$/);
   if (pm) {
@@ -284,8 +286,8 @@ function procesarSKU(raw) {
 
 function formatearVariante(raw) {
   if (!raw) return '';
-  raw = raw.replace(/AR$/i, '');                     // Omitir AR en talles de calzado
-  raw = raw.replace(/([A-Za-z]{2,})(\d)/g, '$1 $2'); // VERDE46 → VERDE 46
+  raw = raw.replace(/AR$/i, '');
+  raw = raw.replace(/([A-Za-z]{2,})(\d)/g, '$1 $2');
   return raw.trim();
 }
 
@@ -296,7 +298,6 @@ function mostrarTabla(filas) {
   tfoot.innerHTML = '';
 
   let totalUnidades = 0;
-
   for (const { sku, variante, cant } of filas) {
     const tr = tbody.insertRow();
     tr.insertCell().textContent = sku;
