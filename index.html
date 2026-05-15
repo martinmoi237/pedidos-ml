@@ -107,6 +107,7 @@ tfoot td { padding: 9px 16px; border-top: 2px solid #e8e8e8; font-weight: 600; c
   </div>
 
   <div id="estado"></div>
+  <button id="btn-cancelar" style="display:none;margin:8px auto;background:#c00;color:#fff;border:none;padding:8px 22px;border-radius:6px;cursor:pointer;font-size:15px;" onclick="cancelarAnalisis()">Cancelar análisis</button>
   <div id="resumen"></div>
 
   <div id="resultado">
@@ -160,6 +161,7 @@ let gruposData = {};
 let pdfSources = [];
 let filasActuales = [];
 let currentJobId = null;
+let analisisCancelado = false;
 
 window.addEventListener('beforeunload', () => {
   if (currentJobId) {
@@ -167,6 +169,17 @@ window.addEventListener('beforeunload', () => {
     currentJobId = null;
   }
 });
+
+function cancelarAnalisis() {
+  analisisCancelado = true;
+  if (currentJobId) {
+    fetch(`/api/parsear-cancel?id=${currentJobId}`).catch(() => {});
+    currentJobId = null;
+  }
+  document.getElementById('btn-cancelar').style.display = 'none';
+  estadoEl.textContent = 'Análisis cancelado.';
+  estadoEl.style.color = '#c00';
+}
 
 // ─── SKU processing (client-side, deterministic) ──────────────
 function formatVariante(raw) {
@@ -403,8 +416,11 @@ async function procesarArchivos(files) {
   const { PDFDocument } = PDFLib;
   const newResults = [];
   let errores = [];
+  analisisCancelado = false;
+  document.getElementById('btn-cancelar').style.display = 'block';
 
   for (let i = 0; i < files.length; i++) {
+    if (analisisCancelado) break;
     const file = files[i];
     if (pdfSources.find(s => s.filename === file.name)) {
       errores.push(`${file.name}: ya está cargado`);
@@ -422,9 +438,10 @@ async function procesarArchivos(files) {
       formData.append('pdf', file);
 
       if (pageCount <= 25) {
-        // Sync directo para PDFs chicos (sin AbortController — evita doble llamada a Claude)
+        // Sync directo para PDFs chicos
         estadoEl.textContent = `⏳ Analizando ${file.name}…`;
         const syncRes = await fetch('/api/parsear', { method: 'POST', body: formData });
+        if (analisisCancelado) break;
         if (syncRes.ok) {
           const d = await syncRes.json();
           if (d.ok) data = d;
@@ -442,7 +459,7 @@ async function procesarArchivos(files) {
 
         const deadline = Date.now() + 10 * 60 * 1000;
         let segs = 0;
-        while (Date.now() < deadline) {
+        while (Date.now() < deadline && !analisisCancelado) {
           await new Promise(r => setTimeout(r, 3000));
           segs += 3;
           estadoEl.textContent = `⏳ Analizando ${file.name} (${pageCount} págs.)… (${segs}s)`;
@@ -451,6 +468,7 @@ async function procesarArchivos(files) {
           if (poll.ready) { data = poll; break; }
         }
         currentJobId = null;
+        if (analisisCancelado) break;
         if (!data) throw new Error('Tiempo de espera agotado — el PDF es demasiado grande');
         if (!data.ok) throw new Error(data.error);
       }
@@ -462,6 +480,9 @@ async function procesarArchivos(files) {
   }
 
   fileInput.value = '';
+  document.getElementById('btn-cancelar').style.display = 'none';
+
+  if (analisisCancelado) return;
 
   if (newResults.length === 0) {
     estadoEl.textContent = 'Error: ' + (errores[0] || 'No se pudo procesar ningún archivo');
