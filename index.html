@@ -410,37 +410,33 @@ async function procesarArchivos(files) {
       const pageCount = tmpPdf.getPageCount();
 
       let data = null;
+      const formData = new FormData();
+      formData.append('pdf', file);
 
-      // Intentar función sync primero (rápida para PDFs normales)
-      estadoEl.textContent = `⏳ Analizando ${file.name}…`;
-      const syncFormData = new FormData();
-      syncFormData.append('pdf', file);
-      const syncCtrl = new AbortController();
-      const syncTimer = setTimeout(() => syncCtrl.abort(), 24000);
-      try {
-        const syncRes = await fetch('/api/parsear', { method: 'POST', body: syncFormData, signal: syncCtrl.signal });
-        clearTimeout(syncTimer);
+      if (pageCount <= 25) {
+        // Sync directo para PDFs chicos (sin AbortController — evita doble llamada a Claude)
+        estadoEl.textContent = `⏳ Analizando ${file.name}…`;
+        const syncRes = await fetch('/api/parsear', { method: 'POST', body: formData });
         if (syncRes.ok) {
-          const syncData = await syncRes.json();
-          if (syncData.ok) data = syncData;
+          const d = await syncRes.json();
+          if (d.ok) data = d;
+          else throw new Error(d.error);
+        } else {
+          throw new Error(`Error del servidor (${syncRes.status})`);
         }
-      } catch (_) { clearTimeout(syncTimer); }
-
-      // Fallback: función background para PDFs grandes (> ~25 páginas)
-      if (!data) {
-        estadoEl.textContent = `⏳ Analizando ${file.name} (PDF grande)…`;
+      } else {
+        // Background + polling para PDFs grandes
+        estadoEl.textContent = `⏳ Analizando ${file.name} (PDF grande, ${pageCount} págs.)…`;
         const jobId = Date.now() + '-' + Math.random().toString(36).slice(2);
-        const bgFormData = new FormData();
-        bgFormData.append('pdf', file);
-        bgFormData.append('jobId', jobId);
-        await fetch('/.netlify/functions/parsear-background', { method: 'POST', body: bgFormData });
+        formData.append('jobId', jobId);
+        await fetch('/.netlify/functions/parsear-background', { method: 'POST', body: formData });
 
         const deadline = Date.now() + 10 * 60 * 1000;
-        let segs = 24;
+        let segs = 0;
         while (Date.now() < deadline) {
           await new Promise(r => setTimeout(r, 3000));
           segs += 3;
-          estadoEl.textContent = `⏳ Analizando ${file.name}… (${segs}s)`;
+          estadoEl.textContent = `⏳ Analizando ${file.name} (${pageCount} págs.)… (${segs}s)`;
           const pollRes = await fetch(`/api/parsear-poll?id=${jobId}`);
           const poll = await pollRes.json();
           if (poll.ready) { data = poll; break; }
