@@ -415,11 +415,20 @@ function reiniciar() {
 async function parsearChunk(chunkBuffer, chunkFile) {
   const formData = new FormData();
   formData.append('pdf', new Blob([chunkBuffer], { type: 'application/pdf' }), chunkFile);
-  const res = await fetch('/api/parsear', { method: 'POST', body: formData });
-  if (!res.ok) throw new Error(`Error del servidor (${res.status})`);
-  const d = await res.json();
-  if (!d.ok) throw new Error(d.error);
-  return d;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 40000);
+  try {
+    const res = await fetch('/api/parsear', { method: 'POST', body: formData, signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) throw new Error(`Error del servidor (${res.status})`);
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error);
+    return d;
+  } catch (e) {
+    clearTimeout(timer);
+    if (e.name === 'AbortError') throw new Error('Sin respuesta después de 40s — API lenta, esperá un momento e intentá de nuevo');
+    throw e;
+  }
 }
 
 async function procesarArchivos(files) {
