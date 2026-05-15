@@ -464,6 +464,7 @@ async function procesarArchivos(files) {
 
       let allFilas = [], allPaginas = [];
 
+      let chunkErrores = [];
       for (let c = 0; c < totalChunks; c++) {
         if (analisisCancelado) break;
         const startPage = c * CHUNK;
@@ -473,21 +474,28 @@ async function procesarArchivos(files) {
           : `Analizando ${file.name}…`;
         estadoEl.innerHTML = `<span class="spinner"></span>${label}`;
 
-        // Armar chunk PDF
         const chunkDoc = await PDFDocument.create();
         const indices = Array.from({ length: endPage - startPage }, (_, k) => startPage + k);
         const copied = await chunkDoc.copyPages(srcDoc, indices);
         copied.forEach(p => chunkDoc.addPage(p));
         const chunkBuffer = await chunkDoc.save();
 
-        const data = await parsearChunk(chunkBuffer, file.name);
-
-        allFilas.push(...data.filas);
-        (data.paginas || []).forEach(p => allPaginas.push({ ...p, idx: p.idx + startPage }));
+        try {
+          const data = await parsearChunk(chunkBuffer, file.name);
+          allFilas.push(...data.filas);
+          (data.paginas || []).forEach(p => allPaginas.push({ ...p, idx: p.idx + startPage }));
+        } catch (chunkErr) {
+          chunkErrores.push(`págs ${startPage + 1}-${endPage}: ${chunkErr.message}`);
+        }
       }
 
       if (analisisCancelado) break;
-      newResults.push({ filename: file.name, buffer, pageCount, filas: allFilas, paginas: allPaginas });
+      if (allPaginas.length === 0 && chunkErrores.length > 0) {
+        errores.push(`${file.name}: ${chunkErrores.join(', ')}`);
+      } else {
+        if (chunkErrores.length > 0) errores.push(`${file.name} (parcial): ${chunkErrores.join(', ')}`);
+        newResults.push({ filename: file.name, buffer, pageCount, filas: allFilas, paginas: allPaginas });
+      }
     } catch(e) {
       errores.push(`${file.name}: ${e.message}`);
     }
@@ -531,7 +539,18 @@ function mostrarResumen(results, todasLasPaginas) {
 
   let html = `<div class="resumen-title">📋 ${results.length} PDF${results.length > 1 ? 's' : ''} procesado${results.length > 1 ? 's' : ''}</div>`;
   results.forEach(r => {
-    html += `<div class="pdf-row"><span>${r.filename}</span><span class="pag">${r.pageCount} páginas</span></div>`;
+    const detectadas = todasLasPaginas.filter((_, idx) => {
+      // contar páginas de este archivo
+      let offset = 0;
+      for (const s of results) {
+        if (s === r) break;
+        offset += s.paginas.length;
+      }
+      return idx >= offset && idx < offset + r.paginas.length;
+    }).length;
+    const faltantes = r.pageCount - r.paginas.length;
+    const warn = faltantes > 0 ? ` <span style="color:#c00">⚠ ${faltantes} pág. sin detectar</span>` : '';
+    html += `<div class="pdf-row"><span>${r.filename}</span><span class="pag">${r.pageCount} páginas${warn}</span></div>`;
   });
   if (results.length > 1) {
     html += `<div class="total-row">
