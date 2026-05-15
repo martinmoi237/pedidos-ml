@@ -14,7 +14,10 @@ Para cada etiqueta, identificá el/los SKU(s) y su cantidad:
 - CRÍTICO: el SKU está SIEMPRE precedido por la palabra "SKU:" en la etiqueta. Buscá esa etiqueta específicamente. Todo lo demás (Nombre del comprador, Descripción del producto, Color:, Talle:, Pack Id:, Nombre:, etc.) NO es el SKU. Si no encontrás el campo "SKU:" en la página, devolvé sku="" para esa página.
 - El SKU tiene formato BASE.COLOR+TALLE o BASE-COLOR+TALLE. Devolvé siempre con punto como separador.
 - El BASE es todo lo que está antes del punto/guion: letras y dígitos SIN espacios (ejemplos: OMPISF02, FNAPOLO0, EO020000P12).
-- CRÍTICO — O vs 0: el 0 (cero) tiene barra diagonal, la O (letra) es redonda. En palabras españolas (POLO, MEDIA, CALZA, BOTA, etc.) todo es letra O. Los ceros aparecen en códigos numéricos.
+- CRÍTICO — caracteres similares: prestá atención a estas confusiones frecuentes:
+  * O vs 0: la O (letra) es redonda, el 0 (cero) tiene barra diagonal. En palabras españolas (POLO, MEDIA, CALZA, BOTA, etc.) todo es letra O. Los ceros aparecen en códigos numéricos.
+  * B vs 8: la B (letra) tiene palo izquierdo recto y dos protuberancias hacia la derecha. El 8 (ocho) es simétrico, dos óvalos apilados sin palo. En un código como CO808004, los 8 son dígitos.
+  * NO inventes separadores. Si el SKU en la etiqueta no tiene punto ni guion visible, devolvé el código completo sin separador.
 - La cantidad es el número que dice la etiqueta ("X Unidades"), o 1 si no especifica.
 - NO multipliques por el sufijo de pack — devolvé la cantidad cruda.
 - Si hay múltiples SKUs en la página, listá TODOS con cantidad 1 cada uno.

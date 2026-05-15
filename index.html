@@ -277,6 +277,15 @@ function lookupSku(skuMap, base, variante) {
     const combined = (b + variante.replace(/\s+/g, '')).toUpperCase();
     if (skuMap.has(combined)) return skuMap.get(combined);
   }
+  // Fallback: ignorar sufijo de pack P[n] al final (ej: "FV0250JUP3" → "FV0250JU")
+  const sinPack = b.replace(/P\d+$/i, '');
+  if (sinPack !== b) {
+    if (skuMap.has(sinPack)) return skuMap.get(sinPack);
+    if (variante) {
+      const combined = (sinPack + variante.replace(/\s+/g, '')).toUpperCase();
+      if (skuMap.has(combined)) return skuMap.get(combined);
+    }
+  }
   return null;
 }
 
