@@ -457,7 +457,7 @@ async function parsearChunk(chunkBuffer, chunkFile, chunkPageCount, intento = 0)
 
 async function procesarArchivos(files) {
   const { PDFDocument } = PDFLib;
-  const CHUNK = 20; // páginas por chunk
+  const CHUNK = 15; // páginas por chunk
   const newResults = [];
   let errores = [];
   analisisCancelado = false;
@@ -502,6 +502,8 @@ async function procesarArchivos(files) {
           const data = await parsearChunk(chunkBuffer, file.name, endPage - startPage);
           allFilas.push(...data.filas);
           (data.paginas || []).forEach(p => allPaginas.push({ ...p, idx: p.idx + startPage }));
+          // Pausa entre chunks para no agotar el rate limit
+          if (c < totalChunks - 1) await new Promise(r => setTimeout(r, 5000));
         } catch (chunkErr) {
           chunkErrores.push(`págs ${startPage + 1}-${endPage}: ${chunkErr.message}`);
         }
