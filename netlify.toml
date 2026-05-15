@@ -4,3 +4,33 @@
 
 [functions]
   node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/api/parsear"
+  to = "/.netlify/functions/parsear"
+  status = 200
+
+[[redirects]]
+  from = "/api/test"
+  to = "/.netlify/functions/test"
+  status = 200
+
+[[redirects]]
+  from = "/api/parsear-poll"
+  to = "/.netlify/functions/parsear-poll"
+  status = 200
+
+[[redirects]]
+  from = "/api/grupos-get"
+  to = "/.netlify/functions/grupos-get"
+  status = 200
+
+[[redirects]]
+  from = "/api/grupos-set"
+  to = "/.netlify/functions/grupos-set"
+  status = 200
+
+[[redirects]]
+  from = "/api/parsear-cancel"
+  to = "/.netlify/functions/parsear-cancel"
+  status = 200

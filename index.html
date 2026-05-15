@@ -159,6 +159,14 @@ let gruposData = {};
 // pdfSources: [{filename, buffer, pageCount, paginas}]
 let pdfSources = [];
 let filasActuales = [];
+let currentJobId = null;
+
+window.addEventListener('beforeunload', () => {
+  if (currentJobId) {
+    navigator.sendBeacon(`/api/parsear-cancel?id=${currentJobId}`);
+    currentJobId = null;
+  }
+});
 
 // ─── SKU processing (client-side, deterministic) ──────────────
 function formatVariante(raw) {
@@ -429,6 +437,7 @@ async function procesarArchivos(files) {
         estadoEl.textContent = `⏳ Analizando ${file.name} (PDF grande, ${pageCount} págs.)…`;
         const jobId = Date.now() + '-' + Math.random().toString(36).slice(2);
         formData.append('jobId', jobId);
+        currentJobId = jobId;
         await fetch('/.netlify/functions/parsear-background', { method: 'POST', body: formData });
 
         const deadline = Date.now() + 10 * 60 * 1000;
@@ -441,6 +450,7 @@ async function procesarArchivos(files) {
           const poll = await pollRes.json();
           if (poll.ready) { data = poll; break; }
         }
+        currentJobId = null;
         if (!data) throw new Error('Tiempo de espera agotado — el PDF es demasiado grande');
         if (!data.ok) throw new Error(data.error);
       }
