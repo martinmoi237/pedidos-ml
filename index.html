@@ -4,235 +4,679 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SKUs de Pedidos ML</title>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; min-height: 100vh; padding: 32px 24px; color: #222; }
+.container { max-width: 820px; margin: 0 auto; }
+.top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+h1 { font-size: 1.25rem; font-weight: 600; color: #111; }
 
-body {
-  font-family: system-ui, -apple-system, sans-serif;
-  background: #f5f5f5;
-  min-height: 100vh;
-  padding: 32px 24px;
-  color: #222;
-}
+#zona-drop { border: 2px dashed #ccc; border-radius: 10px; padding: 40px 24px; text-align: center; background: white; cursor: pointer; transition: border-color .15s, background .15s; }
+#zona-drop:hover, #zona-drop.drag-over { border-color: #3483fa; background: #f5f9ff; }
+#zona-drop strong { color: #3483fa; font-size: 1rem; display: block; margin-bottom: 4px; }
+#zona-drop p { color: #888; font-size: 0.85rem; margin-top: 6px; }
 
-.container { max-width: 760px; margin: 0 auto; }
+#estado { margin-top: 12px; font-size: 0.875rem; color: #555; min-height: 1.2em; text-align: center; }
 
-h1 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin-bottom: 24px;
-  color: #111;
-}
+/* Resumen PDFs */
+#resumen { display: none; margin-top: 16px; background: white; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); font-size: 0.85rem; }
+#resumen .resumen-title { font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: .04em; color: #666; margin-bottom: 8px; }
+#resumen .pdf-row { display: flex; justify-content: space-between; padding: 3px 0; color: #444; border-bottom: 1px solid #f5f5f5; }
+#resumen .pdf-row:last-child { border-bottom: none; }
+#resumen .pdf-row .pag { font-weight: 600; color: #555; }
+#resumen .total-row { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 2px solid #e8e8e8; font-weight: 600; }
+#resumen .total-ok { color: #00a650; }
+#resumen .total-warn { color: #c00; }
 
-#zona-drop {
-  border: 2px dashed #ccc;
-  border-radius: 10px;
-  padding: 48px 24px;
-  text-align: center;
-  background: white;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-}
-#zona-drop:hover,
-#zona-drop.drag-over {
-  border-color: #3483fa;
-  background: #f5f9ff;
-}
-#zona-drop label {
-  cursor: pointer;
-  font-size: 1rem;
-  display: block;
-}
-#zona-drop strong { color: #3483fa; }
-#zona-drop p {
-  color: #888;
-  font-size: 0.85rem;
-  margin-top: 6px;
-}
-#zona-drop input[type=file] { display: none; }
+#resultado { display: none; margin-top: 20px; }
+.acciones { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+#tablas { max-height: 68vh; overflow-y: auto; }
 
-#estado {
-  margin-top: 14px;
-  font-size: 0.875rem;
-  color: #555;
-  min-height: 1.4em;
-  text-align: center;
-}
-
-#resultado {
-  display: none;
-  margin-top: 24px;
-  background: white;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,.08);
-}
-
-.acciones {
-  display: flex;
-  gap: 8px;
-  padding: 14px 16px;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-button {
-  padding: 6px 14px;
-  border-radius: 6px;
-  border: 1px solid #ddd;
-  cursor: pointer;
-  font-size: 0.875rem;
-  background: white;
-  transition: background 0.1s;
-}
+button { padding: 6px 14px; border-radius: 6px; border: 1px solid #ddd; cursor: pointer; font-size: .875rem; background: white; transition: background .1s; }
 button:hover { background: #f5f5f5; }
-button.primary {
-  background: #3483fa;
-  color: white;
-  border-color: #3483fa;
-}
-button.primary:hover { background: #2968c8; }
+button:disabled { opacity: .6; cursor: default; }
+button.primary { background: #3483fa; color: white; border-color: #3483fa; }
+button.primary:hover:not(:disabled) { background: #2968c8; }
+button.success { background: #00a650; color: white; border-color: #00a650; }
+button.success:hover:not(:disabled) { background: #008040; }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
-th {
-  text-align: left;
-  padding: 10px 16px;
-  background: #fafafa;
-  border-bottom: 1px solid #e8e8e8;
-  font-weight: 600;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #666;
-}
-td {
-  padding: 9px 16px;
-  border-bottom: 1px solid #f3f3f3;
-}
+.seccion-grupo { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 16px; }
+.seccion-grupo-header { padding: 10px 16px; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; background: #fafafa; border-bottom: 1px solid #e8e8e8; color: #555; }
+.grupo-SUBSUELO .seccion-grupo-header { background: #fff8e1; color: #b06000; border-color: #ffe082; }
+.grupo-PLANTABAJA .seccion-grupo-header { background: #e8f5e9; color: #1b5e20; border-color: #a5d6a7; }
+.grupo-PRIMERPISO .seccion-grupo-header { background: #e3f2fd; color: #0d47a1; border-color: #90caf9; }
+.grupo-PECERA .seccion-grupo-header { background: #fce4ec; color: #880e4f; border-color: #f48fb1; }
+.grupo-SINASIGNAR .seccion-grupo-header { background: #f5f5f5; color: #777; }
+
+table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+th { text-align: left; padding: 9px 16px; background: #fafafa; border-bottom: 1px solid #e8e8e8; font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: #666; }
+td { padding: 9px 16px; border-bottom: 1px solid #f3f3f3; }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover td { background: #fafcff; }
 td:last-child, th:last-child { text-align: right; }
 td:last-child { font-weight: 600; }
-td:first-child { font-family: 'Courier New', monospace; font-size: 0.85rem; }
+td:first-child { font-size: .85rem; font-weight: 500; letter-spacing: .02em; }
+tfoot td { padding: 9px 16px; border-top: 2px solid #e8e8e8; font-weight: 600; color: #555; background: #fafafa; }
 
-tfoot td {
-  padding: 10px 16px;
-  border-top: 2px solid #e8e8e8;
-  font-weight: 600;
-  color: #555;
-  background: #fafafa;
-}
-tfoot td:last-child { font-size: 1rem; color: #111; }
+/* Modal */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 100; }
+.modal-overlay.open { display: block; }
+.modal-box { background: white; border-radius: 12px; width: min(720px, 96vw); max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,.2); position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #eee; font-weight: 600; flex-shrink: 0; cursor: move; user-select: none; }
+.modal-close { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #888; padding: 0 4px; }
+.modal-close:hover { color: #222; background: none; }
+.tab-bar { display: flex; border-bottom: 1px solid #e8e8e8; padding: 0 20px; flex-shrink: 0; }
+.tab-btn { background: none; border: none; border-bottom: 2px solid transparent; padding: 10px 14px; font-size: .85rem; font-weight: 600; color: #888; cursor: pointer; margin-bottom: -1px; border-radius: 0; }
+.tab-btn:hover { color: #444; background: none; }
+.tab-btn.active { color: #3483fa; border-bottom-color: #3483fa; }
+.tab-content { display: none; flex: 1; overflow-y: auto; padding: 16px 20px; min-height: 0; }
+.tab-content.active { display: block; }
+.sku-config-hint { font-size: .78rem; color: #888; margin-bottom: 12px; }
+.sku-config-hint code { background: #f0f0f0; padding: 1px 5px; border-radius: 3px; }
+.sku-rows { width: 100%; border-collapse: collapse; }
+.sku-rows th { text-align: left; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #999; padding: 0 6px 8px; border-bottom: none; background: none; }
+.sku-rows td { padding: 4px; vertical-align: middle; }
+.sku-rows input { border: 1px solid #ddd; border-radius: 5px; padding: 5px 8px; font-size: .85rem; outline: none; }
+.sku-rows input:focus { border-color: #3483fa; }
+.inp-sku { width: 110px; text-transform: uppercase; letter-spacing: .02em; }
+.inp-mult { width: 54px; text-align: center; }
+.inp-div { width: 54px; text-align: center; }
+.inp-label { width: 110px; }
+.inp-omitir { width: 110px; }
+.btn-del { background: none; border: none; color: #ccc; font-size: 1.1rem; cursor: pointer; padding: 2px 6px; }
+.btn-del:hover { color: #e53e3e; background: none; }
+.btn-add-sku { margin-top: 10px; font-size: .82rem; color: #3483fa; background: none; border: 1px dashed #3483fa; padding: 5px 12px; border-radius: 5px; cursor: pointer; }
+.btn-add-sku:hover { background: #f0f5ff; }
+.modal-footer { padding: 14px 20px; border-top: 1px solid #eee; display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-shrink: 0; }
+.modal-footer .msg { font-size: .85rem; color: #00a650; margin-right: auto; }
+.modal-footer .msg.err { color: #c00; }
 </style>
 </head>
 <body>
 <div class="container">
-  <h1>SKUs de Pedidos ML</h1>
+  <div class="top-bar">
+    <h1>SKUs de Pedidos ML</h1>
+    <button onclick="abrirModal()">⚙ Configurar grupos</button>
+  </div>
 
-  <div id="zona-drop">
-    <label>
-      <input type="file" id="file-input" accept=".pdf">
-      <strong>Arrastrá el PDF aquí</strong> o hacé click para seleccionarlo
-    </label>
+  <div id="zona-drop" onclick="document.getElementById('file-input').click()">
+    <input type="file" id="file-input" accept=".pdf" multiple style="display:none">
+    <strong>Arrastrá uno o varios PDFs aquí</strong> o hacé click para seleccionarlos
     <p>Etiquetas FLEX de Mercado Libre</p>
   </div>
 
   <div id="estado"></div>
+  <div id="resumen"></div>
 
   <div id="resultado">
     <div class="acciones">
       <button class="primary" onclick="copiarTabla()">Copiar tabla</button>
-      <button onclick="reiniciar()">Nueva</button>
+      <button onclick="descargarXLS()">Descargar XLS</button>
+      <button class="success" id="btn-pdf" style="display:none" onclick="descargarPDF()">Descargar PDF ordenado</button>
     </div>
-    <table id="tabla">
-      <thead>
-        <tr><th>SKU</th><th>Variante</th><th>Cant.</th></tr>
-      </thead>
-      <tbody></tbody>
-      <tfoot></tfoot>
-    </table>
+    <div id="tablas"></div>
+    <div style="margin-top:16px;text-align:right">
+      <button onclick="reiniciar()" style="color:#c00;border-color:#c00">Nueva consulta</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal grupos -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      Configurar grupos de almacén
+      <button class="modal-close" onclick="cerrarModal()">×</button>
+    </div>
+    <div class="tab-bar" id="tab-bar"></div>
+    <div id="tab-contents"></div>
+    <div class="modal-footer">
+      <span class="msg" id="modal-msg"></span>
+      <button onclick="cerrarModal()">Cancelar</button>
+      <button class="primary" id="btn-guardar" onclick="guardarGrupos()">Guardar</button>
+    </div>
   </div>
 </div>
 
 <script>
+const GRUPOS_CONFIG = [
+  { id: 'pecera',     label: 'PECERA',      emoji: '🔴' },
+  { id: 'primerpiso', label: 'PRIMER PISO', emoji: '🔵' },
+  { id: 'plantabaja', label: 'PLANTA BAJA', emoji: '🟢' },
+  { id: 'subsuelo',   label: 'SUBSUELO',    emoji: '🟡' },
+];
+const GRUPO_ORDEN = { 'PECERA': 0, 'PRIMER PISO': 1, 'PLANTA BAJA': 2, 'SUBSUELO': 3 };
+
 const zona = document.getElementById('zona-drop');
 const fileInput = document.getElementById('file-input');
 const estadoEl = document.getElementById('estado');
+const resumenEl = document.getElementById('resumen');
 const resultadoEl = document.getElementById('resultado');
+const tablasEl = document.getElementById('tablas');
 
+let gruposData = {};
+// pdfSources: [{filename, buffer, pageCount, paginas}]
+let pdfSources = [];
+let filasActuales = [];
+
+// ─── SKU processing (client-side, deterministic) ──────────────
+function formatVariante(raw) {
+  if (!raw) return '';
+  raw = raw.replace(/AR$/i, '');
+  // Dígitos antes de letras = talle antes de color → poner color primero: 44AZUL → AZUL 44
+  raw = raw.replace(/^(\d+)([A-Za-z].*)$/, '$2 $1');
+  // "T" antes de dígitos al final = Talle: NEGROT4 → NEGRO T4
+  raw = raw.replace(/([A-Za-z])T(\d+)$/i, '$1 T$2');
+  // Separar letras seguidas de dígito con espacio
+  raw = raw.replace(/([A-Za-z]{2,})(\d)/g, '$1 $2');
+  return raw.trim();
+}
+
+function procesarFilasRaw(rawFilas) {
+  const acum = new Map();
+  for (const row of rawFilas) {
+    const skuRaw = (row.sku || '').trim();
+    if (!skuRaw) continue;
+
+    const sepIdx = skuRaw.search(/[.\-]/);
+    let base = sepIdx > -1 ? skuRaw.slice(0, sepIdx) : skuRaw;
+    const varRaw = sepIdx > -1 ? skuRaw.slice(sepIdx + 1) : (row.variante || '');
+
+    const pm = base.match(/P(\d+)$/i);
+    const packSize = pm ? parseInt(pm[1]) : 1;
+    if (pm) base = base.slice(0, -pm[0].length);
+
+    const variante = formatVariante(varRaw);
+    const key = base + '\t' + variante;
+    acum.set(key, (acum.get(key) || 0) + (row.cant || 1) * packSize);
+  }
+  return Array.from(acum.entries())
+    .map(([key, cant]) => {
+      const [sku, variante] = key.split('\t');
+      return { sku, variante, cant };
+    })
+    .sort((a, b) => a.sku.localeCompare(b.sku) || a.variante.localeCompare(b.variante));
+}
+
+// ─── Drag & drop ──────────────────────────────────────────────
 zona.addEventListener('dragover', e => { e.preventDefault(); zona.classList.add('drag-over'); });
 zona.addEventListener('dragleave', () => zona.classList.remove('drag-over'));
 zona.addEventListener('drop', e => {
-  e.preventDefault();
-  zona.classList.remove('drag-over');
-  const f = e.dataTransfer.files[0];
-  if (f && f.name.endsWith('.pdf')) procesarArchivo(f);
+  e.preventDefault(); zona.classList.remove('drag-over');
+  const files = [...e.dataTransfer.files].filter(f => f.name.endsWith('.pdf'));
+  if (files.length) procesarArchivos(files);
 });
 fileInput.addEventListener('change', () => {
-  if (fileInput.files[0]) procesarArchivo(fileInput.files[0]);
+  const files = [...fileInput.files];
+  if (files.length) procesarArchivos(files);
 });
 
+// ─── Grupos config ────────────────────────────────────────────
+function migrateGrupos(raw) {
+  const result = {};
+  GRUPOS_CONFIG.forEach(g => {
+    const val = raw[g.id];
+    if (typeof val === 'string') {
+      result[g.id] = val.split('\n').filter(s => s.trim()).map(s => ({ sku: s.trim().toUpperCase(), div: '', label: '' }));
+    } else {
+      result[g.id] = Array.isArray(val) ? val : [];
+    }
+  });
+  return result;
+}
+
+function buildSkuMap() {
+  const map = new Map();
+  GRUPOS_CONFIG.forEach(g => {
+    (gruposData[g.id] || []).forEach(row => {
+      const sku = (row.sku || '').trim().toUpperCase();
+      if (sku) map.set(sku, { grupo: g.label, mult: row.mult || '', div: row.div, label: row.label, omitir: row.omitir || '' });
+    });
+  });
+  return map;
+}
+
+function applyOmitir(variante, omitir) {
+  if (!omitir || !variante) return variante;
+  let v = variante;
+  omitir.split(',').map(t => t.trim()).filter(t => t).forEach(term => {
+    v = v.replace(new RegExp('\\b' + term + '\\b', 'gi'), '').replace(/\s+/g, ' ').trim();
+  });
+  return v;
+}
+
+function lookupSku(skuMap, base, variante) {
+  const b = base.toUpperCase();
+  if (skuMap.has(b)) return skuMap.get(b);
+  // Fallback: base+variante combinados (ej: "OMPISF" + "02" → "OMPISF02")
+  if (variante) {
+    const combined = (b + variante.replace(/\s+/g, '')).toUpperCase();
+    if (skuMap.has(combined)) return skuMap.get(combined);
+  }
+  return null;
+}
+
+function formatCant(count, cfg) {
+  if (!cfg || !cfg.label) return String(count);
+  const mult = parseInt(cfg.mult) || 1;
+  const divisor = parseInt(cfg.div) || 1;
+  const total = count * mult;
+  const n = divisor > 1 ? Math.round(total / divisor) : total;
+  const label = cfg.label.trim();
+  let singular, plural;
+  if (label.endsWith('es')) {
+    singular = label.slice(0, -2); plural = label;        // unidades→unidad
+  } else if (label.endsWith('s')) {
+    singular = label.slice(0, -1); plural = label;        // docenas→docena
+  } else {
+    singular = label;
+    const esUpper = label === label.toUpperCase();
+    plural = 'aeiouáéíóú'.includes(label.slice(-1).toLowerCase())
+      ? label + (esUpper ? 'S' : 's')
+      : label + (esUpper ? 'ES' : 'es');
+  }
+  return `${n} ${n === 1 ? singular : plural}`;
+}
+
+// ─── Modal ────────────────────────────────────────────────────
+function buildModal() {
+  const tabBar = document.getElementById('tab-bar');
+  const tabContents = document.getElementById('tab-contents');
+  tabBar.innerHTML = ''; tabContents.innerHTML = '';
+  GRUPOS_CONFIG.forEach((g, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn' + (i === 0 ? ' active' : '');
+    btn.textContent = g.emoji + ' ' + g.label;
+    btn.dataset.tab = g.id;
+    btn.onclick = () => switchTab(g.id);
+    tabBar.appendChild(btn);
+    const div = document.createElement('div');
+    div.className = 'tab-content' + (i === 0 ? ' active' : '');
+    div.id = 'tab-' + g.id;
+    div.innerHTML = `<p class="sku-config-hint"><b>×</b>: multiplicador (ej. ×6 si 1 etiqueta = 6 unidades). <b>÷</b>: divisor para presentaciones (ej. ÷12 para docenas). <b>Omitir</b>: palabras a ocultar de la variante.</p>
+      <table class="sku-rows"><thead><tr><th>SKU base</th><th>×</th><th>÷</th><th>Unidad</th><th>Omitir variante</th><th></th></tr></thead><tbody id="rows-${g.id}"></tbody></table>
+      <button class="btn-add-sku" onclick="addRow('${g.id}')">+ Agregar SKU</button>`;
+    tabContents.appendChild(div);
+  });
+}
+
+function switchTab(id) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + id));
+}
+
+function renderRows(grupoId) {
+  const tbody = document.getElementById('rows-' + grupoId);
+  tbody.innerHTML = '';
+  (gruposData[grupoId] || []).forEach((row, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><input class="inp-sku" value="${esc(row.sku)}" placeholder="EJ: MEDCAL" oninput="this.value=this.value.toUpperCase();updateRow('${grupoId}',${i},'sku',this.value)"></td>
+      <td><input class="inp-mult" type="number" min="1" value="${esc(row.mult)}" placeholder="1" oninput="updateRow('${grupoId}',${i},'mult',this.value)"></td>
+      <td><input class="inp-div" type="number" min="1" value="${esc(row.div)}" placeholder="1" oninput="updateRow('${grupoId}',${i},'div',this.value)"></td>
+      <td><input class="inp-label" value="${esc(row.label)}" placeholder="ej: docenas" oninput="updateRow('${grupoId}',${i},'label',this.value)"></td>
+      <td><input class="inp-omitir" value="${esc(row.omitir)}" placeholder="ej: AZUL" oninput="updateRow('${grupoId}',${i},'omitir',this.value.toUpperCase())"></td>
+      <td><button class="btn-del" onclick="removeRow('${grupoId}',${i})">×</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function updateRow(g, i, f, v) { if (!gruposData[g]) gruposData[g] = []; gruposData[g][i][f] = f === 'sku' ? v.toUpperCase() : v; }
+function sortRows(g) {
+  if (!gruposData[g]) return;
+  const focused = document.activeElement;
+  gruposData[g].sort((a, b) => (a.sku || '').localeCompare(b.sku || ''));
+  renderRows(g);
+  // Restaurar foco si es posible
+  if (focused && focused.dataset && focused.dataset.restore) focused.focus();
+}
+function addRow(g) { if (!gruposData[g]) gruposData[g] = []; gruposData[g].push({ sku: '', mult: '', div: '', label: '', omitir: '' }); renderRows(g); document.getElementById('rows-' + g).lastElementChild?.querySelector('.inp-sku')?.focus(); }
+function removeRow(g, i) { gruposData[g].splice(i, 1); renderRows(g); }
+function esc(s) { return (s || '').replace(/"/g, '&quot;'); }
+
+async function abrirModal() {
+  document.getElementById('modal-msg').textContent = '';
+  document.getElementById('modal-msg').className = 'msg';
+  resetModalPos();
+  document.getElementById('modal-overlay').classList.add('open');
+  buildModal();
+  document.getElementById('btn-guardar').disabled = true;
+  document.getElementById('btn-guardar').textContent = 'Cargando…';
+  try {
+    const res = await fetch('/api/grupos-get');
+    const data = await res.json();
+    if (data.ok) gruposData = migrateGrupos(data.grupos);
+  } catch(e) {}
+  GRUPOS_CONFIG.forEach(g => renderRows(g.id));
+  document.getElementById('btn-guardar').disabled = false;
+  document.getElementById('btn-guardar').textContent = 'Guardar';
+}
+
+function cerrarModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+
+async function guardarGrupos() {
+  const btn = document.getElementById('btn-guardar');
+  const msg = document.getElementById('modal-msg');
+  btn.disabled = true; btn.textContent = 'Guardando…'; msg.textContent = '';
+  const data = {};
+  GRUPOS_CONFIG.forEach(g => {
+    data[g.id] = (gruposData[g.id] || [])
+      .filter(r => (r.sku || '').trim())
+      .sort((a, b) => (a.sku || '').localeCompare(b.sku || ''));
+  });
+  try {
+    const res = await fetch('/api/grupos-set', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    const result = await res.json();
+    if (!result.ok) throw new Error(result.error);
+    gruposData = data;
+    try { localStorage.setItem('pedidos-grupos', JSON.stringify(data)); } catch(_) {}
+    msg.textContent = '✓ Guardado';
+    setTimeout(cerrarModal, 700);
+    if (filasActuales.length > 0) mostrarTabla(filasActuales);
+  } catch(e) {
+    msg.className = 'msg err'; msg.textContent = 'Error: ' + e.message;
+  } finally { btn.disabled = false; btn.textContent = 'Guardar'; }
+}
+
+document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target === document.getElementById('modal-overlay')) cerrarModal(); });
+
+// ─── Procesar archivos ────────────────────────────────────────
 function reiniciar() {
   resultadoEl.style.display = 'none';
+  resumenEl.style.display = 'none';
   estadoEl.textContent = '';
+  estadoEl.style.color = '';
   fileInput.value = '';
+  pdfSources = []; filasActuales = [];
+  document.getElementById('btn-pdf').style.display = 'none';
 }
 
-async function procesarArchivo(file) {
-  estadoEl.textContent = 'Analizando PDF con IA… (puede tardar unos segundos)';
-  resultadoEl.style.display = 'none';
-  try {
-    const formData = new FormData();
-    formData.append('pdf', file);
+async function procesarArchivos(files) {
+  const { PDFDocument } = PDFLib;
+  const newResults = [];
+  let errores = [];
 
-    const res = await fetch('/api/parsear', { method: 'POST', body: formData });
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error);
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (pdfSources.find(s => s.filename === file.name)) {
+      errores.push(`${file.name}: ya está cargado`);
+      continue;
+    }
+    estadoEl.textContent = `Analizando ${i + 1}/${files.length}: ${file.name}…`;
+    estadoEl.style.color = '';
+    try {
+      const buffer = await file.arrayBuffer();
+      const tmpPdf = await PDFDocument.load(buffer);
+      const pageCount = tmpPdf.getPageCount();
 
-    mostrarTabla(data.filas);
-  } catch (e) {
-    console.error(e);
-    estadoEl.textContent = 'Error: ' + e.message;
+      let data = null;
+
+      // Intentar función sync primero (rápida para PDFs normales)
+      estadoEl.textContent = `⏳ Analizando ${file.name}…`;
+      const syncFormData = new FormData();
+      syncFormData.append('pdf', file);
+      const syncCtrl = new AbortController();
+      const syncTimer = setTimeout(() => syncCtrl.abort(), 24000);
+      try {
+        const syncRes = await fetch('/api/parsear', { method: 'POST', body: syncFormData, signal: syncCtrl.signal });
+        clearTimeout(syncTimer);
+        if (syncRes.ok) {
+          const syncData = await syncRes.json();
+          if (syncData.ok) data = syncData;
+        }
+      } catch (_) { clearTimeout(syncTimer); }
+
+      // Fallback: función background para PDFs grandes (> ~25 páginas)
+      if (!data) {
+        estadoEl.textContent = `⏳ Analizando ${file.name} (PDF grande)…`;
+        const jobId = Date.now() + '-' + Math.random().toString(36).slice(2);
+        const bgFormData = new FormData();
+        bgFormData.append('pdf', file);
+        bgFormData.append('jobId', jobId);
+        await fetch('/.netlify/functions/parsear-background', { method: 'POST', body: bgFormData });
+
+        const deadline = Date.now() + 10 * 60 * 1000;
+        let segs = 24;
+        while (Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, 3000));
+          segs += 3;
+          estadoEl.textContent = `⏳ Analizando ${file.name}… (${segs}s)`;
+          const pollRes = await fetch(`/api/parsear-poll?id=${jobId}`);
+          const poll = await pollRes.json();
+          if (poll.ready) { data = poll; break; }
+        }
+        if (!data) throw new Error('Tiempo de espera agotado — el PDF es demasiado grande');
+        if (!data.ok) throw new Error(data.error);
+      }
+
+      newResults.push({ filename: file.name, buffer, pageCount, filas: data.filas, paginas: data.paginas || [] });
+    } catch(e) {
+      errores.push(`${file.name}: ${e.message}`);
+    }
   }
+
+  fileInput.value = '';
+
+  if (newResults.length === 0) {
+    estadoEl.textContent = 'Error: ' + (errores[0] || 'No se pudo procesar ningún archivo');
+    estadoEl.style.color = '#c00';
+    return;
+  }
+
+  // Acumular sobre los PDFs ya cargados
+  pdfSources.push(...newResults);
+
+  const todasLasPaginas = [];
+  pdfSources.forEach((src, srcIdx) => {
+    src.paginas.forEach(p => todasLasPaginas.push({ ...p, srcIdx }));
+  });
+
+  filasActuales = procesarFilasRaw(pdfSources.flatMap(r => r.filas));
+
+  mostrarResumen(pdfSources, todasLasPaginas);
+  mostrarTabla(filasActuales);
+
+  pdfSources._paginas = todasLasPaginas;
+  document.getElementById('btn-pdf').style.display = todasLasPaginas.length > 0 ? 'inline-block' : 'none';
+
+  estadoEl.textContent = errores.length > 0 ? `⚠ ${errores.join('; ')}` : '';
+  estadoEl.style.color = errores.length > 0 ? '#c00' : '';
 }
 
+function mostrarResumen(results, todasLasPaginas) {
+  const totalOriginal = results.reduce((s, r) => s + r.pageCount, 0);
+  const totalDetectadas = todasLasPaginas.length;
+  const ok = totalDetectadas === totalOriginal;
+
+  let html = `<div class="resumen-title">📋 ${results.length} PDF${results.length > 1 ? 's' : ''} procesado${results.length > 1 ? 's' : ''}</div>`;
+  results.forEach(r => {
+    html += `<div class="pdf-row"><span>${r.filename}</span><span class="pag">${r.pageCount} páginas</span></div>`;
+  });
+  if (results.length > 1) {
+    html += `<div class="total-row">
+      <span>Total original</span>
+      <span class="${ok ? 'total-ok' : 'total-warn'}">${totalOriginal} páginas → PDF ordenado: ${totalDetectadas} pág. ${ok ? '✓' : '⚠'}</span>
+    </div>`;
+  } else {
+    html += `<div class="total-row">
+      <span></span>
+      <span class="${ok ? 'total-ok' : 'total-warn'}">Original: ${totalOriginal} pág. · Ordenado: ${totalDetectadas} pág. ${ok ? '✓' : '⚠'}</span>
+    </div>`;
+  }
+
+  resumenEl.innerHTML = html;
+  resumenEl.style.display = 'block';
+}
+
+// ─── Tabla ────────────────────────────────────────────────────
 function mostrarTabla(filas) {
-  const tbody = document.querySelector('#tabla tbody');
-  const tfoot = document.querySelector('#tabla tfoot');
-  tbody.innerHTML = '';
-  tfoot.innerHTML = '';
+  const skuMap = buildSkuMap();
+  tablasEl.innerHTML = '';
+  const porGrupo = {};
+  GRUPOS_CONFIG.forEach(g => { porGrupo[g.label] = []; });
+  porGrupo['SIN ASIGNAR'] = [];
 
-  let totalUnidades = 0;
-  for (const { sku, variante, cant } of filas) {
-    const tr = tbody.insertRow();
-    tr.insertCell().textContent = sku;
-    tr.insertCell().textContent = variante;
-    tr.insertCell().textContent = cant;
-    totalUnidades += cant;
+  for (const fila of filas) {
+    const cfg = lookupSku(skuMap, fila.sku, fila.variante);
+    const grupo = cfg ? cfg.grupo : 'SIN ASIGNAR';
+    porGrupo[grupo].push({ ...fila, cfg: cfg || null });
   }
 
-  const tfr = tfoot.insertRow();
-  tfr.insertCell().textContent = filas.length + ' SKUs';
-  tfr.insertCell().textContent = '';
-  tfr.insertCell().textContent = totalUnidades;
+  [...GRUPOS_CONFIG.map(g => g.label), 'SIN ASIGNAR'].forEach(label => {
+    const items = porGrupo[label];
+    if (!items || items.length === 0) return;
+    const cls = label.replace(/\s+/g, '');
+    const div = document.createElement('div');
+    div.className = `seccion-grupo grupo-${cls}`;
+    div.innerHTML = `<div class="seccion-grupo-header">${label}</div>
+      <table>
+        <thead><tr><th>SKU</th><th>Variante</th><th>Cant.</th></tr></thead>
+        <tbody>${items.map(r => `<tr><td>${r.sku}</td><td>${applyOmitir(r.variante, r.cfg?.omitir)}</td><td>${formatCant(r.cant, r.cfg)}</td></tr>`).join('')}</tbody>
+      </table>`;
+    tablasEl.appendChild(div);
+  });
 
-  estadoEl.textContent = `Listo: ${filas.length} SKUs, ${totalUnidades} unidades.`;
   resultadoEl.style.display = 'block';
 }
 
-function copiarTabla() {
-  const filas = [...document.querySelectorAll('#tabla tbody tr')];
-  const lines = ['SKU\tVariante\tCant.'];
-  filas.forEach(tr => {
-    lines.push([...tr.querySelectorAll('td')].map(td => td.textContent).join('\t'));
-  });
-  navigator.clipboard.writeText(lines.join('\n'))
-    .then(() => { estadoEl.textContent = 'Copiado al portapapeles.'; })
-    .catch(() => { estadoEl.textContent = 'No se pudo copiar automáticamente.'; });
+// ─── PDF ──────────────────────────────────────────────────────
+async function descargarPDF() {
+  const todasLasPaginas = pdfSources._paginas || [];
+  if (!todasLasPaginas.length || !pdfSources.length) return;
+  const btn = document.getElementById('btn-pdf');
+  btn.textContent = 'Generando…'; btn.disabled = true;
+  try {
+    const skuMap = buildSkuMap();
+    const sorted = [...todasLasPaginas].sort((a, b) => {
+      // 1. COLECTA (0) antes que FLEX (1)
+      const ta = (a.tipo || '').toUpperCase() === 'COLECTA' ? 0 : 1;
+      const tb = (b.tipo || '').toUpperCase() === 'COLECTA' ? 0 : 1;
+      if (ta !== tb) return ta - tb;
+      // 2. Orden por grupo
+      const ca = lookupSku(skuMap, String(a.sku_orden), null);
+      const cb = lookupSku(skuMap, String(b.sku_orden), null);
+      const oa = GRUPO_ORDEN[ca?.grupo] ?? 99;
+      const ob = GRUPO_ORDEN[cb?.grupo] ?? 99;
+      if (oa !== ob) return oa - ob;
+      // 3. Alfabético
+      return String(a.sku_orden).localeCompare(String(b.sku_orden));
+    });
+
+    const { PDFDocument } = PDFLib;
+    const loadedPdfs = {};
+    const newPdf = await PDFDocument.create();
+    for (const p of sorted) {
+      if (!loadedPdfs[p.srcIdx]) loadedPdfs[p.srcIdx] = await PDFDocument.load(pdfSources[p.srcIdx].buffer);
+      const [page] = await newPdf.copyPages(loadedPdfs[p.srcIdx], [p.idx]);
+      newPdf.addPage(page);
+    }
+    const bytes = await newPdf.save();
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const baseName = pdfSources.length === 1
+      ? pdfSources[0].filename.replace(/\.pdf$/i, '') + '_ordenado.pdf'
+      : 'pedidos_ordenados.pdf';
+    a.download = baseName;
+    a.click();
+    URL.revokeObjectURL(url);
+  } finally { btn.textContent = 'Descargar PDF ordenado'; btn.disabled = false; }
 }
+
+// ─── XLS ─────────────────────────────────────────────────────
+function descargarXLS() {
+  const GRUPO_COLORS = {
+    'PECERA': '#fce4ec', 'PRIMER PISO': '#e3f2fd',
+    'PLANTA BAJA': '#e8f5e9', 'SUBSUELO': '#fff8e1', 'SIN ASIGNAR': '#f5f5f5'
+  };
+  let html = '﻿<html><head><meta charset="UTF-8"></head><body><table>';
+  document.querySelectorAll('.seccion-grupo').forEach(sec => {
+    const grupo = sec.querySelector('.seccion-grupo-header').textContent.trim();
+    const bg = GRUPO_COLORS[grupo] || '#f0f0f0';
+    html += `<tr><td colspan="3" style="background:${bg};font-weight:bold;font-size:11pt;padding:6px 8px">${grupo}</td></tr>`;
+    html += `<tr style="background:#ebebeb"><th style="padding:4px 8px">SKU</th><th style="padding:4px 8px">Variante</th><th style="padding:4px 8px">Cant.</th></tr>`;
+    sec.querySelectorAll('tbody tr').forEach(tr => {
+      const tds = [...tr.querySelectorAll('td')];
+      html += `<tr><td style="padding:3px 8px">${tds[0]?.textContent||''}</td><td style="padding:3px 8px">${tds[1]?.textContent||''}</td><td style="padding:3px 8px;text-align:right">${tds[2]?.textContent||''}</td></tr>`;
+    });
+    html += '<tr><td colspan="3" style="padding:4px"></td></tr>';
+  });
+  html += '</table></body></html>';
+  const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (pdfSources.length === 1 ? pdfSources[0].filename.replace(/\.pdf$/i, '') : 'pedidos') + '.xls';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── Copiar ───────────────────────────────────────────────────
+function copiarTabla() {
+  const lineas = ['SKU\tVariante\tCant.'];
+  document.querySelectorAll('.seccion-grupo').forEach(sec => {
+    lineas.push('', '--- ' + sec.querySelector('.seccion-grupo-header').textContent.trim() + ' ---');
+    sec.querySelectorAll('tbody tr').forEach(tr => {
+      lineas.push([...tr.querySelectorAll('td')].map(td => td.textContent).join('\t'));
+    });
+  });
+  navigator.clipboard.writeText(lineas.join('\n'))
+    .then(() => { estadoEl.textContent = 'Copiado.'; })
+    .catch(() => { estadoEl.textContent = 'No se pudo copiar.'; });
+}
+
+// ─── Modal drag ───────────────────────────────────────────────
+(function() {
+  let active = false, sx, sy, bx, by;
+  const header = document.querySelector('.modal-header');
+  const box = document.querySelector('.modal-box');
+
+  header.addEventListener('mousedown', e => {
+    if (e.target.closest('.modal-close')) return;
+    const rect = box.getBoundingClientRect();
+    // Switch from transform-based centering to pixel position
+    box.style.transform = 'none';
+    box.style.left = rect.left + 'px';
+    box.style.top = rect.top + 'px';
+    bx = rect.left; by = rect.top;
+    sx = e.clientX; sy = e.clientY;
+    active = true;
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!active) return;
+    box.style.left = (bx + e.clientX - sx) + 'px';
+    box.style.top  = (by + e.clientY - sy) + 'px';
+  });
+
+  document.addEventListener('mouseup', () => { active = false; });
+})();
+
+function resetModalPos() {
+  const box = document.querySelector('.modal-box');
+  box.style.left = ''; box.style.top = '';
+  box.style.transform = 'translate(-50%, -50%)';
+}
+
+// ─── Init ─────────────────────────────────────────────────────
+(async () => {
+  // Cargar desde localStorage primero (disponible inmediatamente)
+  try {
+    const local = localStorage.getItem('pedidos-grupos');
+    if (local) gruposData = migrateGrupos(JSON.parse(local));
+  } catch(_) {}
+  // Luego sobreescribir con Blobs (fuente de verdad compartida entre dispositivos)
+  try {
+    const res = await fetch('/api/grupos-get');
+    const data = await res.json();
+    if (data.ok && data.grupos && Object.keys(data.grupos).length > 0) {
+      gruposData = migrateGrupos(data.grupos);
+      try { localStorage.setItem('pedidos-grupos', JSON.stringify(gruposData)); } catch(_) {}
+    }
+  } catch(e) {}
+})();
 </script>
 </body>
 </html>
