@@ -477,14 +477,16 @@ async function procesarArchivos(files) {
       const srcDoc = await PDFDocument.load(buffer);
       const pageCount = srcDoc.getPageCount();
       const totalChunks = Math.ceil(pageCount / CHUNK);
+      // Balancear chunks para evitar finales muy chicos (ej: [20,3] → [12,11])
+      const chunkSize = Math.ceil(pageCount / totalChunks);
 
       let allFilas = [], allPaginas = [];
 
       let chunkErrores = [];
       for (let c = 0; c < totalChunks; c++) {
         if (analisisCancelado) break;
-        const startPage = c * CHUNK;
-        const endPage = Math.min(startPage + CHUNK, pageCount);
+        const startPage = c * chunkSize;
+        const endPage = Math.min(startPage + chunkSize, pageCount);
         const label = totalChunks > 1
           ? `Analizando ${file.name} (parte ${c + 1}/${totalChunks})…`
           : `Analizando ${file.name}…`;
