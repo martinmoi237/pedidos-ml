@@ -468,7 +468,7 @@ async function procesarArchivos(files) {
         // Armar chunk PDF
         const chunkDoc = await PDFDocument.create();
         const indices = Array.from({ length: endPage - startPage }, (_, k) => startPage + k);
-        const copied = await chunkDoc.copyPagesFrom(srcDoc, indices);
+        const copied = await chunkDoc.copyPages(srcDoc, indices);
         copied.forEach(p => chunkDoc.addPage(p));
         const chunkBuffer = await chunkDoc.save();
 
