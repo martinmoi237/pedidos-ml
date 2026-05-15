@@ -18,6 +18,8 @@ h1 { font-size: 1.25rem; font-weight: 600; color: #111; }
 #zona-drop p { color: #888; font-size: 0.85rem; margin-top: 6px; }
 
 #estado { margin-top: 12px; font-size: 0.875rem; color: #555; min-height: 1.2em; text-align: center; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #ccc; border-top-color: #3483fa; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 6px; }
 
 /* Resumen PDFs */
 #resumen { display: none; margin-top: 16px; background: white; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); font-size: 0.85rem; }
@@ -103,7 +105,7 @@ tfoot td { padding: 9px 16px; border-top: 2px solid #e8e8e8; font-weight: 600; c
   <div id="zona-drop" onclick="document.getElementById('file-input').click()">
     <input type="file" id="file-input" accept=".pdf" multiple style="display:none">
     <strong>Arrastrá uno o varios PDFs aquí</strong> o hacé click para seleccionarlos
-    <p>Etiquetas FLEX de Mercado Libre</p>
+    <p>Etiquetas de Mercado Libre</p>
   </div>
 
   <div id="estado"></div>
@@ -412,7 +414,7 @@ function reiniciar() {
   document.getElementById('btn-pdf').style.display = 'none';
 }
 
-async function parsearChunk(chunkBuffer, chunkFile) {
+async function parsearChunk(chunkBuffer, chunkFile, intento = 0) {
   const formData = new FormData();
   formData.append('pdf', new Blob([chunkBuffer], { type: 'application/pdf' }), chunkFile);
   const ctrl = new AbortController();
@@ -420,13 +422,19 @@ async function parsearChunk(chunkBuffer, chunkFile) {
   try {
     const res = await fetch('/api/parsear', { method: 'POST', body: formData, signal: ctrl.signal });
     clearTimeout(timer);
+    if (res.status === 429 && intento < 3) {
+      const espera = (intento + 1) * 15;
+      estadoEl.innerHTML = `<span class="spinner"></span>Rate limit — esperando ${espera}s antes de reintentar…`;
+      await new Promise(r => setTimeout(r, espera * 1000));
+      return parsearChunk(chunkBuffer, chunkFile, intento + 1);
+    }
     if (!res.ok) throw new Error(`Error del servidor (${res.status})`);
     const d = await res.json();
     if (!d.ok) throw new Error(d.error);
     return d;
   } catch (e) {
     clearTimeout(timer);
-    if (e.name === 'AbortError') throw new Error('Sin respuesta después de 40s — API lenta, esperá un momento e intentá de nuevo');
+    if (e.name === 'AbortError') throw new Error('Sin respuesta después de 40s — intentá de nuevo');
     throw e;
   }
 }
@@ -461,9 +469,9 @@ async function procesarArchivos(files) {
         const startPage = c * CHUNK;
         const endPage = Math.min(startPage + CHUNK, pageCount);
         const label = totalChunks > 1
-          ? `⏳ Analizando ${file.name} (parte ${c + 1}/${totalChunks})…`
-          : `⏳ Analizando ${file.name}…`;
-        estadoEl.textContent = label;
+          ? `Analizando ${file.name} (parte ${c + 1}/${totalChunks})…`
+          : `Analizando ${file.name}…`;
+        estadoEl.innerHTML = `<span class="spinner"></span>${label}`;
 
         // Armar chunk PDF
         const chunkDoc = await PDFDocument.create();
