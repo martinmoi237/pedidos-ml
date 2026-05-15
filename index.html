@@ -412,8 +412,19 @@ function reiniciar() {
   document.getElementById('btn-pdf').style.display = 'none';
 }
 
+async function parsearChunk(chunkBuffer, chunkFile) {
+  const formData = new FormData();
+  formData.append('pdf', new Blob([chunkBuffer], { type: 'application/pdf' }), chunkFile);
+  const res = await fetch('/api/parsear', { method: 'POST', body: formData });
+  if (!res.ok) throw new Error(`Error del servidor (${res.status})`);
+  const d = await res.json();
+  if (!d.ok) throw new Error(d.error);
+  return d;
+}
+
 async function procesarArchivos(files) {
   const { PDFDocument } = PDFLib;
+  const CHUNK = 20; // páginas por chunk
   const newResults = [];
   let errores = [];
   analisisCancelado = false;
@@ -430,50 +441,36 @@ async function procesarArchivos(files) {
     estadoEl.style.color = '';
     try {
       const buffer = await file.arrayBuffer();
-      const tmpPdf = await PDFDocument.load(buffer);
-      const pageCount = tmpPdf.getPageCount();
+      const srcDoc = await PDFDocument.load(buffer);
+      const pageCount = srcDoc.getPageCount();
+      const totalChunks = Math.ceil(pageCount / CHUNK);
 
-      let data = null;
-      const formData = new FormData();
-      formData.append('pdf', file);
+      let allFilas = [], allPaginas = [];
 
-      if (pageCount <= 25) {
-        // Sync directo para PDFs chicos
-        estadoEl.textContent = `⏳ Analizando ${file.name}…`;
-        const syncRes = await fetch('/api/parsear', { method: 'POST', body: formData });
+      for (let c = 0; c < totalChunks; c++) {
         if (analisisCancelado) break;
-        if (syncRes.ok) {
-          const d = await syncRes.json();
-          if (d.ok) data = d;
-          else throw new Error(d.error);
-        } else {
-          throw new Error(`Error del servidor (${syncRes.status})`);
-        }
-      } else {
-        // Background + polling para PDFs grandes
-        estadoEl.textContent = `⏳ Analizando ${file.name} (PDF grande, ${pageCount} págs.)…`;
-        const jobId = Date.now() + '-' + Math.random().toString(36).slice(2);
-        formData.append('jobId', jobId);
-        currentJobId = jobId;
-        await fetch('/.netlify/functions/parsear-background', { method: 'POST', body: formData });
+        const startPage = c * CHUNK;
+        const endPage = Math.min(startPage + CHUNK, pageCount);
+        const label = totalChunks > 1
+          ? `⏳ Analizando ${file.name} (parte ${c + 1}/${totalChunks})…`
+          : `⏳ Analizando ${file.name}…`;
+        estadoEl.textContent = label;
 
-        const deadline = Date.now() + 10 * 60 * 1000;
-        let segs = 0;
-        while (Date.now() < deadline && !analisisCancelado) {
-          await new Promise(r => setTimeout(r, 3000));
-          segs += 3;
-          estadoEl.textContent = `⏳ Analizando ${file.name} (${pageCount} págs.)… (${segs}s)`;
-          const pollRes = await fetch(`/api/parsear-poll?id=${jobId}`);
-          const poll = await pollRes.json();
-          if (poll.ready) { data = poll; break; }
-        }
-        currentJobId = null;
-        if (analisisCancelado) break;
-        if (!data) throw new Error('Tiempo de espera agotado — el PDF es demasiado grande');
-        if (!data.ok) throw new Error(data.error);
+        // Armar chunk PDF
+        const chunkDoc = await PDFDocument.create();
+        const indices = Array.from({ length: endPage - startPage }, (_, k) => startPage + k);
+        const copied = await chunkDoc.copyPagesFrom(srcDoc, indices);
+        copied.forEach(p => chunkDoc.addPage(p));
+        const chunkBuffer = await chunkDoc.save();
+
+        const data = await parsearChunk(chunkBuffer, file.name);
+
+        allFilas.push(...data.filas);
+        (data.paginas || []).forEach(p => allPaginas.push({ ...p, idx: p.idx + startPage }));
       }
 
-      newResults.push({ filename: file.name, buffer, pageCount, filas: data.filas, paginas: data.paginas || [] });
+      if (analisisCancelado) break;
+      newResults.push({ filename: file.name, buffer, pageCount, filas: allFilas, paginas: allPaginas });
     } catch(e) {
       errores.push(`${file.name}: ${e.message}`);
     }
