@@ -414,9 +414,10 @@ function reiniciar() {
   document.getElementById('btn-pdf').style.display = 'none';
 }
 
-async function parsearChunk(chunkBuffer, chunkFile, intento = 0) {
+async function parsearChunk(chunkBuffer, chunkFile, chunkPageCount, intento = 0) {
   const formData = new FormData();
   formData.append('pdf', new Blob([chunkBuffer], { type: 'application/pdf' }), chunkFile);
+  formData.append('pageCount', String(chunkPageCount));
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 40000);
   try {
@@ -426,11 +427,17 @@ async function parsearChunk(chunkBuffer, chunkFile, intento = 0) {
       const espera = (intento + 1) * 15;
       estadoEl.innerHTML = `<span class="spinner"></span>Rate limit — esperando ${espera}s antes de reintentar…`;
       await new Promise(r => setTimeout(r, espera * 1000));
-      return parsearChunk(chunkBuffer, chunkFile, intento + 1);
+      return parsearChunk(chunkBuffer, chunkFile, chunkPageCount, intento + 1);
     }
     if (!res.ok) throw new Error(`Error del servidor (${res.status})`);
     const d = await res.json();
-    if (!d.ok) throw new Error(d.error);
+    if (d.incomplete && intento < 2) {
+      // Claude devolvió menos páginas de las esperadas — reintentar
+      estadoEl.innerHTML = `<span class="spinner"></span>Páginas incompletas (${d.paginas.length}/${chunkPageCount}) — reintentando…`;
+      await new Promise(r => setTimeout(r, 3000));
+      return parsearChunk(chunkBuffer, chunkFile, chunkPageCount, intento + 1);
+    }
+    if (!d.ok && !d.incomplete) throw new Error(d.error);
     return d;
   } catch (e) {
     clearTimeout(timer);
@@ -481,7 +488,7 @@ async function procesarArchivos(files) {
         const chunkBuffer = await chunkDoc.save();
 
         try {
-          const data = await parsearChunk(chunkBuffer, file.name);
+          const data = await parsearChunk(chunkBuffer, file.name, endPage - startPage);
           allFilas.push(...data.filas);
           (data.paginas || []).forEach(p => allPaginas.push({ ...p, idx: p.idx + startPage }));
         } catch (chunkErr) {

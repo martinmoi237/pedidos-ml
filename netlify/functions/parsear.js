@@ -1,31 +1,31 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-const PROMPT = `Analizá este PDF de etiquetas FLEX de MercadoLibre Argentina.
-Cada página es una etiqueta de envío.
+function buildPrompt(pageCount) {
+  return `Analizá este PDF de etiquetas de MercadoLibre Argentina.
+Este PDF tiene exactamente ${pageCount} página${pageCount === 1 ? '' : 's'}. Cada página es una etiqueta de envío.
+
+CRÍTICO: tu respuesta en "paginas" DEBE tener EXACTAMENTE ${pageCount} entrada${pageCount === 1 ? '' : 's'}, una por cada página, en orden. No omitas ninguna página aunque no tenga SKU.
 
 Necesito DOS cosas:
 
 ## 1. TABLA DE SKUs
 
 Para cada etiqueta, identificá el/los SKU(s) y su cantidad:
-- El SKU en la etiqueta tiene el formato BASE.COLOR+TALLE o BASE-COLOR+TALLE (el separador puede ser punto o guion), por ejemplo: OMPISF02.NEGRO38, FNAPOLO0.AZUL42, EO020000P12.ROJO46, FD700300-BLANCO. Devolvé siempre con punto como separador (BASE.COLORTALLE), aunque en la etiqueta aparezca guion.
-- El BASE es todo lo que está antes del punto: una secuencia continua de letras y dígitos SIN espacios ni puntos internos (ejemplos: OMPISF02, FNAPOLO0, EO020000P12, BPMANTA2). El punto solo aparece UNA vez, separando base de color/talle.
-- Devolvé el SKU como BASE.COLORTALLE exactamente. Si no hay punto en la etiqueta, devolvé solo el BASE.
 - CRÍTICO: el SKU está SIEMPRE precedido por la palabra "SKU:" en la etiqueta. Buscá esa etiqueta específicamente. Todo lo demás (Nombre del comprador, Descripción del producto, Color:, Talle:, Pack Id:, Nombre:, etc.) NO es el SKU. Si no encontrás el campo "SKU:" en la página, devolvé sku="" para esa página.
-- CRÍTICO — O vs 0: el 0 (cero) tiene barra diagonal, la O (letra) es redonda. Los SKUs contienen palabras en español (POLO, MEDIA, CALZA, BOTA, RUSO, PUNTA, PISO, etc.) — en esas secuencias todo es letra O. Los ceros aparecen en códigos numéricos. Ejemplo: FNAPOLO0 = FN+APOLO+0, no FNAPOL+00.
-- La cantidad es el número que dice la etiqueta ("X Unidades", o 1 si no especifica)
-- NO multipliques por el número del sufijo de pack — devolvé la cantidad cruda
-- Si la página tiene múltiples SKUs (aunque no diga "X productos"), listá TODOS con cantidad 1 cada uno
-- Agrupá SKUs idénticos (mismo string exacto) sumando cantidades
+- El SKU tiene formato BASE.COLOR+TALLE o BASE-COLOR+TALLE. Devolvé siempre con punto como separador.
+- El BASE es todo lo que está antes del punto/guion: letras y dígitos SIN espacios (ejemplos: OMPISF02, FNAPOLO0, EO020000P12).
+- CRÍTICO — O vs 0: el 0 (cero) tiene barra diagonal, la O (letra) es redonda. En palabras españolas (POLO, MEDIA, CALZA, BOTA, etc.) todo es letra O. Los ceros aparecen en códigos numéricos.
+- La cantidad es el número que dice la etiqueta ("X Unidades"), o 1 si no especifica.
+- NO multipliques por el sufijo de pack — devolvé la cantidad cruda.
+- Si hay múltiples SKUs en la página, listá TODOS con cantidad 1 cada uno.
+- Agrupá SKUs idénticos sumando cantidades.
 
 ## 2. ORDEN DE PÁGINAS
 
-Para cada página:
-- sku_orden = BASE del PRIMER SKU (todo antes del punto, sin sufijo de pack P6/P12/etc.). Ej: "EO020000P12.ROJO46" → "EO020000"
-- tipo = tipo de pedido según el código presente en la parte izquierda de la etiqueta:
-  * "COLECTA": hay un código de barras lineal grande (barras verticales, tipo EAN/Code128) en el centro-izquierdo
-  * "FLEX": hay un código QR grande (cuadrado con patrones de puntos) en el centro-izquierdo
-  (ignorá el QR pequeño que aparece más abajo en las etiquetas de colecta, ese no cuenta)
+Para cada una de las ${pageCount} páginas (índice 0 a ${pageCount - 1}):
+- idx = índice de la página (0 para la primera, ${pageCount - 1} para la última)
+- sku_orden = BASE del primer SKU (sin sufijo de pack P6/P12/etc.)
+- tipo = "COLECTA" si hay código de barras lineal grande en el centro-izquierdo, "FLEX" si hay código QR grande
 
 Respondé ÚNICAMENTE con JSON válido, sin texto ni markdown:
 {
@@ -33,7 +33,8 @@ Respondé ÚNICAMENTE con JSON válido, sin texto ni markdown:
   "paginas": [{"idx":0,"sku_orden":"BASE","tipo":"FLEX"},...]
 }
 
-En "filas": variante es siempre string vacío (la variante va dentro del campo sku después del punto). Una entrada por página del PDF en "paginas".`;
+En "paginas" debe haber EXACTAMENTE ${pageCount} entradas. "variante" es siempre string vacío.`;
+}
 
 export const handler = async (event) => {
   const headers = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
@@ -51,6 +52,7 @@ export const handler = async (event) => {
     const bodyBuffer = Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'binary');
     const boundaryBuf = Buffer.from('--' + boundary);
     let fileData = null;
+    let pageCountField = null;
     let pos = 0;
 
     while (pos < bodyBuffer.length) {
@@ -63,11 +65,15 @@ export const handler = async (event) => {
       const dataStart = headerEnd + 4;
       const nextBoundary = bodyBuffer.indexOf(boundaryBuf, dataStart);
       const dataEnd = nextBoundary === -1 ? bodyBuffer.length : nextBoundary - 2;
-      if (partHeader.includes('name="pdf"')) { fileData = bodyBuffer.slice(dataStart, dataEnd); break; }
+      if (partHeader.includes('name="pdf"')) fileData = bodyBuffer.slice(dataStart, dataEnd);
+      if (partHeader.includes('name="pageCount"')) pageCountField = bodyBuffer.slice(dataStart, dataEnd).toString().trim();
       pos = nextBoundary === -1 ? bodyBuffer.length : nextBoundary;
     }
 
     if (!fileData) return { statusCode: 400, headers, body: JSON.stringify({ ok: false, error: 'Sin archivo PDF' }) };
+
+    const expectedPages = pageCountField ? parseInt(pageCountField) : null;
+    const prompt = buildPrompt(expectedPages || 1);
 
     const client = new Anthropic({ apiKey });
     const message = await client.messages.create({
@@ -75,7 +81,7 @@ export const handler = async (event) => {
       max_tokens: 4000,
       messages: [{ role: 'user', content: [
         { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: fileData.toString('base64') } },
-        { type: 'text', text: PROMPT }
+        { type: 'text', text: prompt }
       ]}]
     });
 
@@ -88,11 +94,16 @@ export const handler = async (event) => {
       parsed = JSON.parse(match[0]);
     }
 
-    if (!parsed.filas || !Array.isArray(parsed.filas)) throw new Error('Formato inesperado: ' + JSON.stringify(parsed).substring(0, 300));
+    if (!parsed.filas || !Array.isArray(parsed.filas)) throw new Error('Formato inesperado');
 
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, filas: parsed.filas, paginas: parsed.paginas || [] }) };
+    const paginas = parsed.paginas || [];
+    if (expectedPages && paginas.length !== expectedPages) {
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: false, error: `Páginas incompletas: esperaba ${expectedPages}, recibí ${paginas.length}`, incomplete: true, filas: parsed.filas, paginas }) };
+    }
+
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, filas: parsed.filas, paginas }) };
   } catch (e) {
     const isRateLimit = e.status === 429 || (e.message && e.message.includes('rate_limit'));
-    return { statusCode: isRateLimit ? 429 : 500, headers, body: JSON.stringify({ ok: false, error: e.message, rateLimited: isRateLimit }) };
+    return { statusCode: isRateLimit ? 429 : 500, headers, body: JSON.stringify({ ok: false, error: e.message }) };
   }
 };
