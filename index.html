@@ -324,18 +324,16 @@ function formatCant(count, cfg) {
   const divisor = parseInt(cfg.div) || 1;
   const total = count * mult;
   const n = divisor > 1 ? Math.round(total / divisor) : total;
-  const label = cfg.label.trim();
+  const labelUp = cfg.label.trim().toUpperCase();
+  const labelL = labelUp.toLowerCase();
   let singular, plural;
-  if (label.endsWith('es')) {
-    singular = label.slice(0, -2); plural = label;        // unidades→unidad
-  } else if (label.endsWith('s')) {
-    singular = label.slice(0, -1); plural = label;        // docenas→docena
+  if (labelL.endsWith('es')) {
+    singular = labelUp.slice(0, -2); plural = labelUp;
+  } else if (labelL.endsWith('s')) {
+    singular = labelUp.slice(0, -1); plural = labelUp;
   } else {
-    singular = label;
-    const esUpper = label === label.toUpperCase();
-    plural = 'aeiouáéíóú'.includes(label.slice(-1).toLowerCase())
-      ? label + (esUpper ? 'S' : 's')
-      : label + (esUpper ? 'ES' : 'es');
+    singular = labelUp;
+    plural = 'aeiouáéíóú'.includes(labelL.slice(-1)) ? labelUp + 'S' : labelUp + 'ES';
   }
   return `${n} ${n === 1 ? singular : plural}`;
 }
@@ -773,12 +771,14 @@ function descargarXLS() {
   const COLORES = {
     'PECERA':'#FCE4EC','PRIMER PISO':'#E3F2FD','PLANTA BAJA':'#E8F5E9','SUBSUELO':'#FFF8E1','SIN ASIGNAR':'#F5F5F5'
   };
-  let estilos = '<Styles><Style ss:ID="th"><Font ss:Bold="1"/><Interior ss:Color="#EBEBEB" ss:Pattern="Solid"/></Style>';
+  const BRD = '<Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders>';
+  const CTR = '<Alignment ss:Horizontal="Center" ss:Vertical="Center"/>';
+  let estilos = `<Styles><Style ss:ID="cell">${CTR}${BRD}</Style><Style ss:ID="th"><Font ss:Bold="1"/><Interior ss:Color="#EBEBEB" ss:Pattern="Solid"/>${CTR}${BRD}</Style>`;
   GRUPOS_CONFIG.forEach((g, i) => {
     const c = COLORES[g.label] || '#F0F0F0';
-    estilos += `<Style ss:ID="sec${i}"><Font ss:Bold="1" ss:Size="11"/><Interior ss:Color="${c}" ss:Pattern="Solid"/></Style>`;
+    estilos += `<Style ss:ID="sec${i}"><Font ss:Bold="1" ss:Size="11"/><Interior ss:Color="${c}" ss:Pattern="Solid"/>${CTR}${BRD}</Style>`;
   });
-  estilos += '<Style ss:ID="secSA"><Font ss:Bold="1" ss:Size="11"/><Interior ss:Color="#F5F5F5" ss:Pattern="Solid"/></Style></Styles>';
+  estilos += `<Style ss:ID="secSA"><Font ss:Bold="1" ss:Size="11"/><Interior ss:Color="#F5F5F5" ss:Pattern="Solid"/>${CTR}${BRD}</Style></Styles>`;
 
   let filas = '';
   document.querySelectorAll('.seccion-grupo').forEach(sec => {
@@ -789,7 +789,7 @@ function descargarXLS() {
     filas += `<Row><Cell ss:StyleID="th"><Data ss:Type="String">SKU</Data></Cell><Cell ss:StyleID="th"><Data ss:Type="String">Variante</Data></Cell><Cell ss:StyleID="th"><Data ss:Type="String">Cant.</Data></Cell></Row>`;
     sec.querySelectorAll('tbody tr').forEach(tr => {
       const tds = [...tr.querySelectorAll('td')];
-      filas += `<Row>${[0,1,2].map(i=>`<Cell><Data ss:Type="String">${ex(tds[i]?.textContent||'')}</Data></Cell>`).join('')}</Row>`;
+      filas += `<Row>${[0,1,2].map(i=>`<Cell ss:StyleID="cell"><Data ss:Type="String">${ex(tds[i]?.textContent||'')}</Data></Cell>`).join('')}</Row>`;
     });
     filas += '<Row><Cell/></Row>';
   });
