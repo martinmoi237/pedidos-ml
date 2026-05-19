@@ -85,7 +85,8 @@ tfoot td { padding: 9px 16px; border-top: 2px solid #e8e8e8; font-weight: 600; c
 .inp-mult { width: 54px; text-align: center; }
 .inp-div { width: 54px; text-align: center; }
 .inp-label { width: 110px; }
-.inp-omitir { width: 110px; }
+.inp-omitir { width: 90px; }
+.inp-prefix { width: 70px; }
 .btn-del { background: none; border: none; color: #ccc; font-size: 1.1rem; cursor: pointer; padding: 2px 6px; }
 .btn-del:hover { color: #e53e3e; background: none; }
 .btn-add-sku { margin-top: 10px; font-size: .82rem; color: #3483fa; background: none; border: 1px dashed #3483fa; padding: 5px 12px; border-radius: 5px; cursor: pointer; }
@@ -221,8 +222,11 @@ function procesarFilasRaw(rawFilas) {
     const varRaw = sepIdx > -1 ? skuRaw.slice(sepIdx + 1) : (row.variante || '');
 
     const pm = base.match(/P(\d+)$/i);
-    const packSize = pm ? parseInt(pm[1]) : 1;
+    let packSize = pm ? parseInt(pm[1]) : 1;
     if (pm) base = base.slice(0, -pm[0].length);
+    // Si la variante es puro sufijo de pack (ej: "P12"), absorbela como packSize
+    const pmVar = varRaw.match(/^P(\d+)$/i);
+    if (pmVar) { packSize = parseInt(pmVar[1]); varRaw = ''; }
 
     const variante = formatVariante(varRaw);
     const key = base + '\t' + variante;
@@ -257,7 +261,7 @@ function migrateGrupos(raw) {
     if (typeof val === 'string') {
       result[g.id] = val.split('\n').filter(s => s.trim()).map(s => ({ sku: s.trim().toUpperCase(), div: '', label: '' }));
     } else {
-      result[g.id] = Array.isArray(val) ? val : [];
+      result[g.id] = Array.isArray(val) ? val.map(r => ({ sku: r.sku||'', mult: r.mult||'', div: r.div||'', label: r.label||'', omitir: r.omitir||'', prefix: r.prefix||'' })) : [];
     }
   });
   return result;
@@ -268,7 +272,7 @@ function buildSkuMap() {
   GRUPOS_CONFIG.forEach(g => {
     (gruposData[g.id] || []).forEach(row => {
       const sku = (row.sku || '').trim().toUpperCase();
-      if (sku) map.set(sku, { grupo: g.label, mult: row.mult || '', div: row.div, label: row.label, omitir: row.omitir || '' });
+      if (sku) map.set(sku, { grupo: g.label, mult: row.mult || '', div: row.div, label: row.label, omitir: row.omitir || '', prefix: row.prefix || '' });
     });
   });
   return map;
@@ -280,6 +284,11 @@ function applyOmitir(variante, omitir) {
   omitir.split(',').map(t => t.trim()).filter(t => t).forEach(term => {
     v = v.replace(new RegExp('\\b' + term + '\\b', 'gi'), '').replace(/\s+/g, ' ').trim();
   });
+  return v;
+}
+function displayVariante(variante, cfg) {
+  const v = applyOmitir(variante, cfg?.omitir);
+  if (v && cfg?.prefix) return cfg.prefix + ' ' + v;
   return v;
 }
 
@@ -346,8 +355,8 @@ function buildModal() {
     const div = document.createElement('div');
     div.className = 'tab-content' + (i === 0 ? ' active' : '');
     div.id = 'tab-' + g.id;
-    div.innerHTML = `<p class="sku-config-hint"><b>×</b>: multiplicador (ej. ×6 si 1 etiqueta = 6 unidades). <b>÷</b>: divisor para presentaciones (ej. ÷12 para docenas). <b>Omitir</b>: palabras a ocultar de la variante.</p>
-      <table class="sku-rows"><thead><tr><th>SKU base</th><th>×</th><th>÷</th><th>Unidad</th><th>Omitir variante</th><th></th></tr></thead><tbody id="rows-${g.id}"></tbody></table>
+    div.innerHTML = `<p class="sku-config-hint"><b>×</b>: multiplicador (ej. ×6 si 1 etiqueta = 6 unidades). <b>÷</b>: divisor para presentaciones (ej. ÷12 para docenas). <b>Omitir</b>: palabras a ocultar de la variante. <b>Prefijo</b>: texto antes de la variante (ej: talle).</p>
+      <table class="sku-rows"><thead><tr><th>SKU base</th><th>×</th><th>÷</th><th>Unidad</th><th>Omitir variante</th><th>Prefijo</th><th></th></tr></thead><tbody id="rows-${g.id}"></tbody></table>
       <button class="btn-add-sku" onclick="addRow('${g.id}')">+ Agregar SKU</button>`;
     tabContents.appendChild(div);
   });
@@ -368,6 +377,7 @@ function renderRows(grupoId) {
       <td><input class="inp-div" type="number" min="1" value="${esc(row.div)}" placeholder="1" oninput="updateRow('${grupoId}',${i},'div',this.value)"></td>
       <td><input class="inp-label" value="${esc(row.label)}" placeholder="ej: docenas" oninput="updateRow('${grupoId}',${i},'label',this.value)"></td>
       <td><input class="inp-omitir" value="${esc(row.omitir)}" placeholder="ej: AZUL" oninput="updateRow('${grupoId}',${i},'omitir',this.value.toUpperCase())"></td>
+      <td><input class="inp-prefix" value="${esc(row.prefix)}" placeholder="ej: talle" oninput="updateRow('${grupoId}',${i},'prefix',this.value)"></td>
       <td><button class="btn-del" onclick="removeRow('${grupoId}',${i})">×</button></td>`;
     tbody.appendChild(tr);
   });
@@ -398,7 +408,7 @@ function sortRows(g) {
   // Restaurar foco si es posible
   if (focused && focused.dataset && focused.dataset.restore) focused.focus();
 }
-function addRow(g) { if (!gruposData[g]) gruposData[g] = []; gruposData[g].push({ sku: '', mult: '', div: '', label: '', omitir: '' }); renderRows(g); document.getElementById('rows-' + g).lastElementChild?.querySelector('.inp-sku')?.focus(); }
+function addRow(g) { if (!gruposData[g]) gruposData[g] = []; gruposData[g].push({ sku: '', mult: '', div: '', label: '', omitir: '', prefix: '' }); renderRows(g); document.getElementById('rows-' + g).lastElementChild?.querySelector('.inp-sku')?.focus(); }
 function removeRow(g, i) { gruposData[g].splice(i, 1); renderRows(g); }
 function esc(s) { return (s || '').replace(/"/g, '&quot;'); }
 
@@ -468,12 +478,12 @@ async function guardarGrupos() {
       const s = (r.sku || '').trim().toUpperCase();
       if (!s) continue;
       if (vistos.has(s)) {
-        msg.textContent = `⚠ SKU duplicado: ${s} (en ${vistos.get(s)} y ${g.nombre})`;
+        msg.textContent = `⚠ SKU duplicado: ${s} (en ${vistos.get(s)} y ${g.label})`;
         msg.className = 'msg err';
         btn.disabled = false; btn.textContent = 'Guardar';
         return;
       }
-      vistos.set(s, g.nombre);
+      vistos.set(s, g.label);
     }
   }
   const data = {};
@@ -520,9 +530,10 @@ async function parsearChunk(chunkBuffer, chunkFile, chunkPageCount, intento = 0)
   try {
     const res = await fetch('/api/parsear', { method: 'POST', body: formData, signal: ctrl.signal });
     clearTimeout(timer);
-    if (res.status === 429 && intento < 3) {
+    if ((res.status === 429 || res.status === 504) && intento < 3) {
       const espera = (intento + 1) * 15;
-      estadoEl.innerHTML = `<span class="spinner"></span>Rate limit — esperando ${espera}s antes de reintentar…`;
+      const motivo = res.status === 504 ? 'Timeout del servidor' : 'Rate limit';
+      estadoEl.innerHTML = `<span class="spinner"></span>${motivo} — esperando ${espera}s antes de reintentar…`;
       await new Promise(r => setTimeout(r, espera * 1000));
       return parsearChunk(chunkBuffer, chunkFile, chunkPageCount, intento + 1);
     }
@@ -703,7 +714,7 @@ function mostrarTabla(filas) {
     div.innerHTML = `<div class="seccion-grupo-header">${label}</div>
       <table>
         <thead><tr><th>SKU</th><th>Variante</th><th>Cant.</th></tr></thead>
-        <tbody>${items.map(r => `<tr><td>${r.sku}</td><td>${applyOmitir(r.variante, r.cfg?.omitir)}</td><td>${formatCant(r.cant, r.cfg)}</td></tr>`).join('')}</tbody>
+        <tbody>${items.map(r => `<tr><td>${r.sku}</td><td>${displayVariante(r.variante, r.cfg)}</td><td>${formatCant(r.cant, r.cfg)}</td></tr>`).join('')}</tbody>
       </table>`;
     tablasEl.appendChild(div);
   });
@@ -758,28 +769,40 @@ async function descargarPDF() {
 
 // ─── XLS ─────────────────────────────────────────────────────
 function descargarXLS() {
-  const GRUPO_COLORS = {
-    'PECERA': '#fce4ec', 'PRIMER PISO': '#e3f2fd',
-    'PLANTA BAJA': '#e8f5e9', 'SUBSUELO': '#fff8e1', 'SIN ASIGNAR': '#f5f5f5'
+  function ex(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  const COLORES = {
+    'PECERA':'#FCE4EC','PRIMER PISO':'#E3F2FD','PLANTA BAJA':'#E8F5E9','SUBSUELO':'#FFF8E1','SIN ASIGNAR':'#F5F5F5'
   };
-  let html = '﻿<html><head><meta charset="UTF-8"></head><body><table>';
+  let estilos = '<Styles><Style ss:ID="th"><Font ss:Bold="1"/><Interior ss:Color="#EBEBEB" ss:Pattern="Solid"/></Style>';
+  GRUPOS_CONFIG.forEach((g, i) => {
+    const c = COLORES[g.label] || '#F0F0F0';
+    estilos += `<Style ss:ID="sec${i}"><Font ss:Bold="1" ss:Size="11"/><Interior ss:Color="${c}" ss:Pattern="Solid"/></Style>`;
+  });
+  estilos += '<Style ss:ID="secSA"><Font ss:Bold="1" ss:Size="11"/><Interior ss:Color="#F5F5F5" ss:Pattern="Solid"/></Style></Styles>';
+
+  let filas = '';
   document.querySelectorAll('.seccion-grupo').forEach(sec => {
     const grupo = sec.querySelector('.seccion-grupo-header').textContent.trim();
-    const bg = GRUPO_COLORS[grupo] || '#f0f0f0';
-    html += `<tr><td colspan="3" style="background:${bg};font-weight:bold;font-size:11pt;padding:6px 8px">${grupo}</td></tr>`;
-    html += `<tr style="background:#ebebeb"><th style="padding:4px 8px">SKU</th><th style="padding:4px 8px">Variante</th><th style="padding:4px 8px">Cant.</th></tr>`;
+    const gi = GRUPOS_CONFIG.findIndex(g => g.label === grupo);
+    const sid = gi >= 0 ? `sec${gi}` : 'secSA';
+    filas += `<Row><Cell ss:StyleID="${sid}"><Data ss:Type="String">${ex(grupo)}</Data></Cell><Cell ss:StyleID="${sid}"/><Cell ss:StyleID="${sid}"/></Row>`;
+    filas += `<Row><Cell ss:StyleID="th"><Data ss:Type="String">SKU</Data></Cell><Cell ss:StyleID="th"><Data ss:Type="String">Variante</Data></Cell><Cell ss:StyleID="th"><Data ss:Type="String">Cant.</Data></Cell></Row>`;
     sec.querySelectorAll('tbody tr').forEach(tr => {
       const tds = [...tr.querySelectorAll('td')];
-      html += `<tr><td style="padding:3px 8px">${tds[0]?.textContent||''}</td><td style="padding:3px 8px">${tds[1]?.textContent||''}</td><td style="padding:3px 8px;text-align:right">${tds[2]?.textContent||''}</td></tr>`;
+      filas += `<Row>${[0,1,2].map(i=>`<Cell><Data ss:Type="String">${ex(tds[i]?.textContent||'')}</Data></Cell>`).join('')}</Row>`;
     });
-    html += '<tr><td colspan="3" style="padding:4px"></td></tr>';
+    filas += '<Row><Cell/></Row>';
   });
-  html += '</table></body></html>';
-  const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">${estilos}<Worksheet ss:Name="Pedidos"><Table>${filas}</Table></Worksheet></Workbook>`;
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const ts = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
+  const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = (pdfSources.length === 1 ? pdfSources[0].filename.replace(/\.pdf$/i, '') : 'pedidos') + '.xls';
+  a.download = `listita_${ts}.xls`;
   a.click();
   URL.revokeObjectURL(url);
 }
