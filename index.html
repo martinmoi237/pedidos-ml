@@ -513,6 +513,8 @@ async function parsearChunk(chunkBuffer, chunkFile, chunkPageCount, intento = 0)
   const formData = new FormData();
   formData.append('pdf', new Blob([chunkBuffer], { type: 'application/pdf' }), chunkFile);
   formData.append('pageCount', String(chunkPageCount));
+  const skusConocidos = GRUPOS_CONFIG.flatMap(g => (gruposData[g.id] || []).map(r => r.sku).filter(Boolean)).sort();
+  if (skusConocidos.length) formData.append('skusConocidos', skusConocidos.join(','));
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 40000);
   try {

@@ -1,13 +1,17 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-function buildPrompt(pageCount) {
+function buildPrompt(pageCount, skusConocidos) {
+  const skuRef = skusConocidos && skusConocidos.length
+    ? `\n## REFERENCIA DE SKUs VÁLIDOS\nEstos son los SKUs reales del catálogo. Cuando dudes entre caracteres similares (O/0, B/8, etc.), buscá si el código leído coincide con alguno de esta lista. Si difiere en 1-2 caracteres por confusión visual, USÁ EL DE LA LISTA:\n${skusConocidos.join(', ')}\n`
+    : '';
+
   return `Analizá este PDF de etiquetas de MercadoLibre Argentina.
 Este PDF tiene exactamente ${pageCount} página${pageCount === 1 ? '' : 's'}. Cada página es una etiqueta de envío.
 
 CRÍTICO: tu respuesta en "paginas" DEBE tener EXACTAMENTE ${pageCount} entrada${pageCount === 1 ? '' : 's'}, una por cada página, en orden. No omitas ninguna página aunque no tenga SKU.
 
 Necesito DOS cosas:
-
+${skuRef}
 ## 1. TABLA DE SKUs
 
 Para cada etiqueta, identificá el/los SKU(s) y su cantidad:
@@ -58,6 +62,7 @@ export const handler = async (event) => {
     const boundaryBuf = Buffer.from('--' + boundary);
     let fileData = null;
     let pageCountField = null;
+    let skusConocidosField = null;
     let pos = 0;
 
     while (pos < bodyBuffer.length) {
@@ -72,13 +77,15 @@ export const handler = async (event) => {
       const dataEnd = nextBoundary === -1 ? bodyBuffer.length : nextBoundary - 2;
       if (partHeader.includes('name="pdf"')) fileData = bodyBuffer.slice(dataStart, dataEnd);
       if (partHeader.includes('name="pageCount"')) pageCountField = bodyBuffer.slice(dataStart, dataEnd).toString().trim();
+      if (partHeader.includes('name="skusConocidos"')) skusConocidosField = bodyBuffer.slice(dataStart, dataEnd).toString().trim();
       pos = nextBoundary === -1 ? bodyBuffer.length : nextBoundary;
     }
 
     if (!fileData) return { statusCode: 400, headers, body: JSON.stringify({ ok: false, error: 'Sin archivo PDF' }) };
 
     const expectedPages = pageCountField ? parseInt(pageCountField) : null;
-    const prompt = buildPrompt(expectedPages || 1);
+    const skusConocidos = skusConocidosField ? skusConocidosField.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const prompt = buildPrompt(expectedPages || 1, skusConocidos);
 
     const client = new Anthropic({ apiKey });
     const message = await client.messages.create({
