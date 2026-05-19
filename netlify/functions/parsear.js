@@ -12,13 +12,14 @@ Necesito DOS cosas:
 
 Para cada etiqueta, identificá el/los SKU(s) y su cantidad:
 - CRÍTICO: el SKU está SIEMPRE precedido por la palabra "SKU:" en la etiqueta. Buscá esa etiqueta específicamente. Todo lo demás (Nombre del comprador, Descripción del producto, Color:, Talle:, Pack Id:, Nombre:, etc.) NO es el SKU. Si no encontrás el campo "SKU:" en la página, devolvé sku="" para esa página.
-- El SKU tiene formato BASE.COLOR+TALLE o BASE-COLOR+TALLE. Devolvé siempre con punto como separador.
-- El BASE es todo lo que está antes del punto/guion: letras y dígitos SIN espacios (ejemplos: OMPISF02, FNAPOLO0, EO020000P12).
-- CRÍTICO — caracteres similares: prestá atención a estas confusiones frecuentes:
-  * O vs 0: la O (letra) es redonda, el 0 (cero) tiene barra diagonal. En palabras españolas (POLO, MEDIA, CALZA, BOTA, etc.) todo es letra O. Los ceros aparecen en códigos numéricos.
-  * B vs 8: la B (letra) tiene palo izquierdo recto y dos protuberancias hacia la derecha. El 8 (ocho) es simétrico, dos óvalos apilados sin palo. En CO808004 los 8 son dígitos.
-  * NO agregues ni quites caracteres: copiá el SKU exactamente como aparece, ni un carácter más ni menos. Si el código es EO073000 (8 caracteres), no devuelvas EO0730000 (9 caracteres).
-  * NO inventes separadores. Si el SKU en la etiqueta no tiene punto ni guion visible, devolvé el código completo sin separador.
+- El SKU tiene formato BASE.VARIANTE o BASE-VARIANTE. Devolvé siempre con punto como separador. El campo "sku" debe contener el código COMPLETO incluyendo punto y variante (ej: "OMFRAN02.39"). El campo "variante" en el JSON es SIEMPRE string vacío "".
+- El BASE es todo lo que está antes del punto/guion. La MAYORÍA de los BASE tienen exactamente 8 caracteres (ej: OMPISF02, FNAPOLO0, EO073000, OMFRAN02, CO808004). Si tu BASE tiene 7 o 9 caracteres, revisá bien — probablemente te falta o sobra un carácter.
+- CRÍTICO — caracteres similares, prestalés máxima atención:
+  * O (letra) vs 0 (cero): O es redonda y cerrada, 0 tiene barra diagonal. En palabras españolas (POLO, MEDIA, BOTA, FRANELA, etc.) son letras O. En secuencias numéricas son ceros. Ej: EO0102B0 tiene letras E,O y luego dígitos 0,1,0,2,B,0.
+  * B (letra) vs 0 (cero): B tiene palo vertical izquierdo con dos protuberancias. 0 es un óvalo con barra. En EO0102B0 la B es una letra, no un cero.
+  * B (letra) vs 8 (dígito): B tiene palo izquierdo recto. 8 es simétrico sin palo. En CO808004 los 8 son dígitos.
+  * NO agregues ni quites caracteres. Copiá exactamente lo que ves. EO073000 son 8 caracteres, no 9.
+  * NO inventes separadores. Si no hay punto ni guion visible, devolvé el código completo sin separador.
 - La cantidad es el número que dice la etiqueta ("X Unidades"), o 1 si no especifica.
 - NO multipliques por el sufijo de pack — devolvé la cantidad cruda.
 - Si hay múltiples SKUs en la página, listá TODOS con cantidad 1 cada uno.
