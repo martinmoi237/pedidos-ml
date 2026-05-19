@@ -526,7 +526,11 @@ async function parsearChunk(chunkBuffer, chunkFile, chunkPageCount, intento = 0)
       await new Promise(r => setTimeout(r, espera * 1000));
       return parsearChunk(chunkBuffer, chunkFile, chunkPageCount, intento + 1);
     }
-    if (!res.ok) throw new Error(`Error del servidor (${res.status})`);
+    if (!res.ok) {
+      let msg = `Error del servidor (${res.status})`;
+      try { const ed = await res.json(); if (ed.error) msg += ': ' + ed.error; } catch(_) {}
+      throw new Error(msg);
+    }
     const d = await res.json();
     if (d.incomplete && intento < 2) {
       // Claude devolvió menos páginas de las esperadas — reintentar
