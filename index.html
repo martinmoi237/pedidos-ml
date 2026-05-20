@@ -89,6 +89,8 @@ tfoot td { padding: 9px 16px; border-top: 2px solid #e8e8e8; font-weight: 600; c
 .inp-prefix { width: 70px; }
 .btn-del { background: none; border: none; color: #ccc; font-size: 1.1rem; cursor: pointer; padding: 2px 6px; }
 .btn-del:hover { color: #e53e3e; background: none; }
+.sel-mover { border: 1px solid #ddd; border-radius: 4px; font-size: .75rem; padding: 2px 2px; cursor: pointer; color: #3483fa; background: white; margin-right: 2px; }
+.sel-mover:hover { border-color: #3483fa; }
 .btn-add-sku { margin-top: 10px; font-size: .82rem; color: #3483fa; background: none; border: 1px dashed #3483fa; padding: 5px 12px; border-radius: 5px; cursor: pointer; }
 .btn-add-sku:hover { background: #f0f5ff; }
 .modal-footer { padding: 14px 20px; border-top: 1px solid #eee; display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-shrink: 0; }
@@ -380,7 +382,13 @@ function renderRows(grupoId) {
       <td><input class="inp-label" value="${esc(row.label)}" placeholder="ej: docenas" oninput="updateRow('${grupoId}',${i},'label',this.value)"></td>
       <td><input class="inp-omitir" value="${esc(row.omitir)}" placeholder="ej: AZUL" oninput="updateRow('${grupoId}',${i},'omitir',this.value.toUpperCase())"></td>
       <td><input class="inp-prefix" value="${esc(row.prefix)}" placeholder="ej: talle" oninput="updateRow('${grupoId}',${i},'prefix',this.value)"></td>
-      <td><button class="btn-del" onclick="removeRow('${grupoId}',${i})">×</button></td>`;
+      <td>
+        <select class="sel-mover" title="Mover a grupo…" onchange="if(this.value)moverRow('${grupoId}',this.value,${i});this.value='';">
+          <option value="">↗</option>
+          ${GRUPOS_CONFIG.filter(g=>g.id!==grupoId).map(g=>`<option value="${g.id}">${g.emoji} ${g.label}</option>`).join('')}
+        </select>
+        <button class="btn-del" onclick="removeRow('${grupoId}',${i})">×</button>
+      </td>`;
     tbody.appendChild(tr);
   });
 }
@@ -409,6 +417,14 @@ function sortRows(g) {
   renderRows(g);
   // Restaurar foco si es posible
   if (focused && focused.dataset && focused.dataset.restore) focused.focus();
+}
+function moverRow(desde, hasta, i) {
+  if (!gruposData[hasta]) gruposData[hasta] = [];
+  const row = gruposData[desde].splice(i, 1)[0];
+  gruposData[hasta].push(row);
+  renderRows(desde);
+  renderRows(hasta);
+  switchTab(hasta);
 }
 function addRow(g) { if (!gruposData[g]) gruposData[g] = []; gruposData[g].push({ sku: '', mult: '', div: '', label: '', omitir: '', prefix: '' }); renderRows(g); document.getElementById('rows-' + g).lastElementChild?.querySelector('.inp-sku')?.focus(); }
 function removeRow(g, i) { gruposData[g].splice(i, 1); renderRows(g); }
@@ -761,10 +777,10 @@ async function descargarPDF() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const baseName = pdfSources.length === 1
-      ? pdfSources[0].filename.replace(/\.pdf$/i, '') + '_ordenado.pdf'
-      : 'pedidos_ordenados.pdf';
-    a.download = baseName;
+    const now2 = new Date();
+    const pad2 = n => String(n).padStart(2,'0');
+    const ts2 = `${now2.getFullYear()}-${pad2(now2.getMonth()+1)}-${pad2(now2.getDate())}_${pad2(now2.getHours())}-${pad2(now2.getMinutes())}`;
+    a.download = `listita_${ts2}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
   } finally { btn.textContent = 'Descargar PDF ordenado'; btn.disabled = false; }
