@@ -202,8 +202,6 @@ function cancelarAnalisis() {
 function formatVariante(raw) {
   if (!raw) return '';
   raw = raw.replace(/AR$/i, '');
-  // Talles compuestos "46/47" → solo el primero "46"
-  raw = raw.replace(/(\d+)\/\d+/g, '$1');
   // Dígitos antes de letras = talle antes de color → poner color primero: 44AZUL → AZUL 44
   raw = raw.replace(/^(\d+)([A-Za-z].*)$/, '$2 $1');
   // "T" antes de dígitos al final = Talle: NEGROT4 → NEGRO T4
@@ -286,7 +284,9 @@ function applyOmitir(variante, omitir) {
   if (!omitir || !variante) return variante;
   let v = variante;
   omitir.split(',').map(t => t.trim()).filter(t => t).forEach(term => {
-    v = v.replace(new RegExp('\\b' + term + '\\b', 'gi'), '').replace(/\s+/g, ' ').trim();
+    const esc = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = /[^a-záéíóúüñA-ZÁÉÍÓÚÜÑ0-9]/.test(term) ? esc : '\\b' + esc + '\\b';
+    v = v.replace(new RegExp(pattern, 'gi'), '').replace(/\s+/g, ' ').trim();
   });
   return v;
 }
