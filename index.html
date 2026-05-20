@@ -202,6 +202,8 @@ function cancelarAnalisis() {
 function formatVariante(raw) {
   if (!raw) return '';
   raw = raw.replace(/AR$/i, '');
+  // Talles compuestos "46/47" → solo el primero "46"
+  raw = raw.replace(/(\d+)\/\d+/g, '$1');
   // Dígitos antes de letras = talle antes de color → poner color primero: 44AZUL → AZUL 44
   raw = raw.replace(/^(\d+)([A-Za-z].*)$/, '$2 $1');
   // "T" antes de dígitos al final = Talle: NEGROT4 → NEGRO T4
@@ -219,14 +221,16 @@ function procesarFilasRaw(rawFilas) {
 
     const sepIdx = skuRaw.search(/[.\-]/);
     let base = sepIdx > -1 ? skuRaw.slice(0, sepIdx) : skuRaw;
-    const varRaw = sepIdx > -1 ? skuRaw.slice(sepIdx + 1) : (row.variante || '');
+    let varRaw = sepIdx > -1 ? skuRaw.slice(sepIdx + 1) : (row.variante || '');
 
     const pm = base.match(/P(\d+)$/i);
     let packSize = pm ? parseInt(pm[1]) : 1;
     if (pm) base = base.slice(0, -pm[0].length);
-    // Si la variante es puro sufijo de pack (ej: "P12"), absorbela como packSize
-    const pmVar = varRaw.match(/^P(\d+)$/i);
-    if (pmVar) { packSize = parseInt(pmVar[1]); varRaw = ''; }
+    // "P6.16" o "P6.P16" en varRaw → pack=6, talle=16
+    const pmPackDot = varRaw.match(/^P(\d+)\.P?(\d+)$/i);
+    if (pmPackDot) { packSize = parseInt(pmPackDot[1]); varRaw = pmPackDot[2]; }
+    // Variante puro sufijo de pack (ej: "P12") → absorber como packSize
+    else { const pmVar = varRaw.match(/^P(\d+)$/i); if (pmVar) { packSize = parseInt(pmVar[1]); varRaw = ''; } }
 
     const variante = formatVariante(varRaw);
     const key = base + '\t' + variante;
@@ -729,9 +733,10 @@ async function descargarPDF() {
   try {
     const skuMap = buildSkuMap();
     const sorted = [...todasLasPaginas].sort((a, b) => {
-      // 1. COLECTA (0) antes que FLEX (1)
-      const ta = (a.tipo || '').toUpperCase() === 'COLECTA' ? 0 : 1;
-      const tb = (b.tipo || '').toUpperCase() === 'COLECTA' ? 0 : 1;
+      // 1. RECIBO (0) → COLECTA (1) → FLEX (2)
+      const tipoN = t => t === 'RECIBO' ? 0 : t === 'COLECTA' ? 1 : 2;
+      const ta = tipoN((a.tipo || '').toUpperCase());
+      const tb = tipoN((b.tipo || '').toUpperCase());
       if (ta !== tb) return ta - tb;
       // 2. Orden por grupo
       const ca = lookupSku(skuMap, String(a.sku_orden), null);
