@@ -87,6 +87,7 @@ tfoot td { padding: 9px 16px; border-top: 2px solid #e8e8e8; font-weight: 600; c
 .inp-label { width: 110px; }
 .inp-omitir { width: 90px; }
 .inp-prefix { width: 70px; }
+.inp-obs { width: 140px; }
 .btn-del { background: none; border: none; color: #ccc; font-size: 1.1rem; cursor: pointer; padding: 2px 6px; }
 .btn-del:hover { color: #e53e3e; background: none; }
 .sel-mover { border: 1px solid #ddd; border-radius: 4px; font-size: .75rem; padding: 2px 2px; cursor: pointer; color: #3483fa; background: white; margin-right: 2px; }
@@ -269,7 +270,7 @@ function migrateGrupos(raw) {
     if (typeof val === 'string') {
       result[g.id] = val.split('\n').filter(s => s.trim()).map(s => ({ sku: s.trim().toUpperCase(), div: '', label: '' }));
     } else {
-      result[g.id] = Array.isArray(val) ? val.map(r => ({ sku: r.sku||'', mult: r.mult||'', div: r.div||'', label: r.label||'', omitir: r.omitir||'', prefix: r.prefix||'' })) : [];
+      result[g.id] = Array.isArray(val) ? val.map(r => ({ sku: r.sku||'', mult: r.mult||'', div: r.div||'', label: r.label||'', omitir: r.omitir||'', prefix: r.prefix||'', obs: r.obs||'' })) : [];
     }
   });
   return result;
@@ -280,7 +281,7 @@ function buildSkuMap() {
   GRUPOS_CONFIG.forEach(g => {
     (gruposData[g.id] || []).forEach(row => {
       const sku = (row.sku || '').trim().toUpperCase();
-      if (sku) map.set(sku, { grupo: g.label, mult: row.mult || '', div: row.div, label: row.label, omitir: row.omitir || '', prefix: row.prefix || '' });
+      if (sku) map.set(sku, { grupo: g.label, mult: row.mult || '', div: row.div, label: row.label, omitir: row.omitir || '', prefix: row.prefix || '', obs: row.obs || '' });
     });
   });
   return map;
@@ -365,7 +366,7 @@ function buildModal() {
     div.className = 'tab-content' + (i === 0 ? ' active' : '');
     div.id = 'tab-' + g.id;
     div.innerHTML = `<p class="sku-config-hint"><b>×</b>: multiplicador (ej. ×6 si 1 etiqueta = 6 unidades). <b>÷</b>: divisor para presentaciones (ej. ÷12 para docenas). <b>Omitir</b>: palabras a ocultar de la variante. <b>Prefijo</b>: texto antes de la variante (ej: talle).</p>
-      <table class="sku-rows"><thead><tr><th>SKU base</th><th>×</th><th>÷</th><th>Unidad</th><th>Omitir variante</th><th>Prefijo</th><th></th></tr></thead><tbody id="rows-${g.id}"></tbody></table>
+      <table class="sku-rows"><thead><tr><th>SKU base</th><th>×</th><th>÷</th><th>Unidad</th><th>Omitir variante</th><th>Prefijo</th><th>Observación</th><th></th></tr></thead><tbody id="rows-${g.id}"></tbody></table>
       <button class="btn-add-sku" onclick="addRow('${g.id}')">+ Agregar SKU</button>`;
     tabContents.appendChild(div);
   });
@@ -387,6 +388,7 @@ function renderRows(grupoId) {
       <td><input class="inp-label" value="${esc(row.label)}" placeholder="ej: docenas" oninput="updateRow('${grupoId}',${i},'label',this.value)"></td>
       <td><input class="inp-omitir" value="${esc(row.omitir)}" placeholder="ej: AZUL" oninput="updateRow('${grupoId}',${i},'omitir',this.value.toUpperCase())"></td>
       <td><input class="inp-prefix" value="${esc(row.prefix)}" placeholder="ej: talle" oninput="updateRow('${grupoId}',${i},'prefix',this.value)"></td>
+      <td><input class="inp-obs" value="${esc(row.obs)}" placeholder="nota…" oninput="updateRow('${grupoId}',${i},'obs',this.value)"></td>
       <td>
         <select class="sel-mover" title="Mover a grupo…" onchange="if(this.value)moverRow('${grupoId}',this.value,${i});this.value='';">
           <option value="">↗</option>
@@ -431,7 +433,7 @@ function moverRow(desde, hasta, i) {
   renderRows(hasta);
   switchTab(hasta);
 }
-function addRow(g) { if (!gruposData[g]) gruposData[g] = []; gruposData[g].push({ sku: '', mult: '', div: '', label: '', omitir: '', prefix: '' }); renderRows(g); document.getElementById('rows-' + g).lastElementChild?.querySelector('.inp-sku')?.focus(); }
+function addRow(g) { if (!gruposData[g]) gruposData[g] = []; gruposData[g].push({ sku: '', mult: '', div: '', label: '', omitir: '', prefix: '', obs: '' }); renderRows(g); document.getElementById('rows-' + g).lastElementChild?.querySelector('.inp-sku')?.focus(); }
 function removeRow(g, i) { gruposData[g].splice(i, 1); renderRows(g); }
 function esc(s) { return (s || '').replace(/"/g, '&quot;'); }
 
@@ -736,8 +738,8 @@ function mostrarTabla(filas) {
     div.className = `seccion-grupo grupo-${cls}`;
     div.innerHTML = `<div class="seccion-grupo-header">${label}</div>
       <table>
-        <thead><tr><th>SKU</th><th>Variante</th><th>Cant.</th></tr></thead>
-        <tbody>${items.map(r => `<tr><td>${r.sku}</td><td>${displayVariante(r.variante, r.cfg)}</td><td>${formatCant(r.cant, r.cfg)}</td></tr>`).join('')}</tbody>
+        <thead><tr><th>SKU</th><th>Variante</th><th>Cant.</th><th>Obs.</th></tr></thead>
+        <tbody>${items.map(r => `<tr><td>${r.sku}</td><td>${displayVariante(r.variante, r.cfg)}</td><td>${formatCant(r.cant, r.cfg)}</td><td>${r.cfg?.obs||''}</td></tr>`).join('')}</tbody>
       </table>`;
     tablasEl.appendChild(div);
   });
@@ -811,11 +813,11 @@ function descargarXLS() {
     const grupo = sec.querySelector('.seccion-grupo-header').textContent.trim();
     const gi = GRUPOS_CONFIG.findIndex(g => g.label === grupo);
     const sid = gi >= 0 ? `sec${gi}` : 'secSA';
-    filas += `<Row><Cell ss:StyleID="${sid}"><Data ss:Type="String">${ex(grupo)}</Data></Cell><Cell ss:StyleID="${sid}"/><Cell ss:StyleID="${sid}"/></Row>`;
-    filas += `<Row><Cell ss:StyleID="th"><Data ss:Type="String">SKU</Data></Cell><Cell ss:StyleID="th"><Data ss:Type="String">Variante</Data></Cell><Cell ss:StyleID="th"><Data ss:Type="String">Cant.</Data></Cell></Row>`;
+    filas += `<Row><Cell ss:StyleID="${sid}"><Data ss:Type="String">${ex(grupo)}</Data></Cell><Cell ss:StyleID="${sid}"/><Cell ss:StyleID="${sid}"/><Cell ss:StyleID="${sid}"/></Row>`;
+    filas += `<Row><Cell ss:StyleID="th"><Data ss:Type="String">SKU</Data></Cell><Cell ss:StyleID="th"><Data ss:Type="String">Variante</Data></Cell><Cell ss:StyleID="th"><Data ss:Type="String">Cant.</Data></Cell><Cell ss:StyleID="th"><Data ss:Type="String">Obs.</Data></Cell></Row>`;
     sec.querySelectorAll('tbody tr').forEach(tr => {
       const tds = [...tr.querySelectorAll('td')];
-      filas += `<Row>${[0,1,2].map(i=>`<Cell ss:StyleID="cell"><Data ss:Type="String">${ex(tds[i]?.textContent||'')}</Data></Cell>`).join('')}</Row>`;
+      filas += `<Row>${[0,1,2,3].map(i=>`<Cell ss:StyleID="cell"><Data ss:Type="String">${ex(tds[i]?.textContent||'')}</Data></Cell>`).join('')}</Row>`;
     });
     filas += '<Row><Cell/></Row>';
   });
@@ -835,7 +837,7 @@ function descargarXLS() {
 
 // ─── Copiar ───────────────────────────────────────────────────
 function copiarTabla() {
-  const lineas = ['SKU\tVariante\tCant.'];
+  const lineas = ['SKU\tVariante\tCant.\tObs.'];
   document.querySelectorAll('.seccion-grupo').forEach(sec => {
     lineas.push('', '--- ' + sec.querySelector('.seccion-grupo-header').textContent.trim() + ' ---');
     sec.querySelectorAll('tbody tr').forEach(tr => {
