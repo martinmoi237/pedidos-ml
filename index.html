@@ -167,6 +167,7 @@ const GRUPOS_CONFIG = [
   { id: 'subsuelo',   label: 'SUBSUELO',    emoji: '🟡' },
 ];
 const GRUPO_ORDEN = { 'PECERA': 0, 'PRIMER PISO': 1, 'PLANTA BAJA': 2, 'SUBSUELO': 3 };
+const SKU_ALIAS = { 'CCBOXERP3': 'CC120500P3' };
 
 const zona = document.getElementById('zona-drop');
 const fileInput = document.getElementById('file-input');
@@ -210,13 +211,16 @@ function formatVariante(raw) {
   raw = raw.replace(/([A-Za-z])T(\d+)$/i, '$1 T$2');
   // Separar letras seguidas de dígito con espacio
   raw = raw.replace(/([A-Za-z]{2,})(\d)/g, '$1 $2');
+  // T4 / T36 / T40 → TALLE 4 / TALLE 36 / TALLE 40
+  raw = raw.replace(/\bT(\d+)\b/gi, 'TALLE $1');
   return raw.trim();
 }
 
 function procesarFilasRaw(rawFilas) {
   const acum = new Map();
   for (const row of rawFilas) {
-    const skuRaw = (row.sku || '').trim();
+    let skuRaw = (row.sku || '').trim();
+    skuRaw = SKU_ALIAS[skuRaw.toUpperCase()] || skuRaw;
     if (!skuRaw) continue;
 
     const sepIdx = skuRaw.search(/[.\-]/);
@@ -225,7 +229,7 @@ function procesarFilasRaw(rawFilas) {
 
     const pm = base.match(/P(\d+)$/i);
     let packSize = pm ? parseInt(pm[1]) : 1;
-    if (pm) base = base.slice(0, -pm[0].length);
+    if (pm) base = base.slice(0, -pm[0].length).trim();
     // "P6.16" o "P6.P16" en varRaw → pack=6, talle=16
     const pmPackDot = varRaw.match(/^P(\d+)\.P?(\d+)$/i);
     if (pmPackDot) { packSize = parseInt(pmPackDot[1]); varRaw = pmPackDot[2]; }
@@ -287,7 +291,8 @@ function applyOmitir(variante, omitir) {
   let v = variante;
   omitir.split(',').map(t => t.trim()).filter(t => t).forEach(term => {
     const esc = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const pattern = /[^a-záéíóúüñA-ZÁÉÍÓÚÜÑ0-9]/.test(term) ? esc : '\\b' + esc + '\\b';
+    const noWordBound = /[^a-záéíóúüñA-ZÁÉÍÓÚÜÑ0-9]/.test(term) || /^\d+$/.test(term);
+    const pattern = noWordBound ? esc : '\\b' + esc + '\\b';
     v = v.replace(new RegExp(pattern, 'gi'), '').replace(/\s+/g, ' ').trim();
   });
   return v;
