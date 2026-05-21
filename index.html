@@ -749,8 +749,8 @@ async function descargarPDF() {
   try {
     const skuMap = buildSkuMap();
     const sorted = [...todasLasPaginas].sort((a, b) => {
-      // 1. RECIBO (0) → COLECTA (1) → FLEX (2)
-      const tipoN = t => t === 'RECIBO' ? 0 : t === 'COLECTA' ? 1 : 2;
+      // 1. TURBO (0) → RECIBO (1) → COLECTA (2) → FLEX (3)
+      const tipoN = t => t === 'TURBO' ? 0 : t === 'RECIBO' ? 1 : t === 'COLECTA' ? 2 : 3;
       const ta = tipoN((a.tipo || '').toUpperCase());
       const tb = tipoN((b.tipo || '').toUpperCase());
       if (ta !== tb) return ta - tb;

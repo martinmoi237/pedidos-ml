@@ -34,7 +34,7 @@ Para cada etiqueta, identificá el/los SKU(s) y su cantidad:
 Para cada una de las ${pageCount} páginas (índice 0 a ${pageCount - 1}):
 - idx = índice de la página (0 para la primera, ${pageCount - 1} para la última)
 - sku_orden = BASE del primer SKU (sin sufijo de pack P6/P12/etc.)
-- tipo = "RECIBO" si la página es un "Recibo de entrega de producto" (tiene ese título y un "OK" grande en el margen superior derecho, sin código de barras ni QR grande). "COLECTA" si hay código de barras lineal grande en el centro-izquierdo. "FLEX" si hay código QR grande.
+- tipo = "RECIBO" si la página es un "Recibo de entrega de producto" (tiene ese título y un "OK" grande en el margen superior derecho, sin código de barras ni QR grande). "TURBO" si hay un recuadro negro con la palabra "TURBO" visible en la etiqueta (puede tener QR pero lo que la distingue es ese bloque negro "TURBO"). "COLECTA" si hay código de barras lineal grande en el centro-izquierdo. "FLEX" si hay código QR grande y no es TURBO.
 
 Respondé ÚNICAMENTE con JSON válido, sin texto ni markdown:
 {
