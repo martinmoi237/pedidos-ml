@@ -1,14 +1,16 @@
 import { getStore } from '@netlify/blobs';
 
-export const handler = async (event) => {
+export default async (req) => {
   const headers = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
+  if (req.method === 'OPTIONS') return new Response('', { status: 200, headers });
   try {
-    const grupos = JSON.parse(event.body);
-    const store = getStore({ name: 'pedidos-config', siteID: '70734c8a-78c9-471a-8fd8-aa88cfea8636', token: process.env.NETLIFY_BLOBS_TOKEN });
+    const grupos = await req.json();
+    const store = getStore('pedidos-config');
     await store.set('grupos', JSON.stringify(grupos));
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
   } catch (e) {
-    return { statusCode: 500, headers, body: JSON.stringify({ ok: false, error: e.message }) };
+    return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers });
   }
 };
+
+export const config = { path: '/api/grupos-set' };

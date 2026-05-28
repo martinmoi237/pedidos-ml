@@ -20,15 +20,6 @@
   to = "/.netlify/functions/parsear-poll"
   status = 200
 
-[[redirects]]
-  from = "/api/grupos-get"
-  to = "/.netlify/functions/grupos-get"
-  status = 200
-
-[[redirects]]
-  from = "/api/grupos-set"
-  to = "/.netlify/functions/grupos-set"
-  status = 200
 
 [[redirects]]
   from = "/api/parsear-cancel"
