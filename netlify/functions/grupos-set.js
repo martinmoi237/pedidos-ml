@@ -5,7 +5,7 @@ export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
   try {
     const grupos = JSON.parse(event.body);
-    const store = getStore('pedidos-config');
+    const store = getStore({ name: 'pedidos-config', siteID: '70734c8a-78c9-471a-8fd8-aa88cfea8636', token: process.env.NETLIFY_API_ACCESS_TOKEN });
     await store.set('grupos', JSON.stringify(grupos));
     return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
   } catch (e) {
