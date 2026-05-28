@@ -110,12 +110,10 @@ export const handler = async (event) => {
 
     const paginas = parsed.paginas || [];
     if (expectedPages && paginas.length !== expectedPages) {
-      const uso = message.usage;
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: false, error: `Páginas incompletas: esperaba ${expectedPages}, recibí ${paginas.length}`, incomplete: true, filas: parsed.filas, paginas, uso: { entrada: uso.input_tokens, salida: uso.output_tokens } }) };
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: false, error: `Páginas incompletas: esperaba ${expectedPages}, recibí ${paginas.length}`, incomplete: true, filas: parsed.filas, paginas }) };
     }
 
-    const uso = message.usage;
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, filas: parsed.filas, paginas, uso: { entrada: uso.input_tokens, salida: uso.output_tokens } }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, filas: parsed.filas, paginas }) };
   } catch (e) {
     const isRateLimit = e.status === 429 || (e.message && e.message.includes('rate_limit'));
     return { statusCode: isRateLimit ? 429 : 500, headers, body: JSON.stringify({ ok: false, error: e.message }) };

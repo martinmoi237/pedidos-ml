@@ -116,10 +116,7 @@ tfoot td { padding: 9px 16px; border-top: 2px solid #e8e8e8; font-weight: 600; c
 <div class="container">
   <div class="top-bar">
     <h1>SKUs de Pedidos ML</h1>
-    <div style="display:flex;align-items:center;gap:10px">
-      <span id="costo-sesion" title="Costo acumulado de esta sesión (Anthropic)" style="display:none;font-size:0.8rem;color:#888;background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:3px 9px;cursor:default"></span>
-      <button onclick="abrirModal()">⚙ Configurar grupos</button>
-    </div>
+    <button onclick="abrirModal()">⚙ Configurar grupos</button>
   </div>
 
   <div id="zona-drop" onclick="document.getElementById('file-input').click()">
@@ -177,15 +174,6 @@ const GRUPOS_CONFIG = [
 const GRUPO_ORDEN = { 'PECERA': 0, 'PRIMER PISO': 1, 'PLANTA BAJA': 2, 'SUBSUELO': 3 };
 const SKU_ALIAS = { 'CCBOXERP3': 'CC120500P3' };
 const SKU_TALLE_VARIANTS = new Set(['PALUMBAR']);
-
-let sesionCostoUSD = 0;
-function registrarUso(uso) {
-  if (!uso) return;
-  sesionCostoUSD += (uso.entrada || 0) * 3 / 1e6 + (uso.salida || 0) * 15 / 1e6;
-  const el = document.getElementById('costo-sesion');
-  el.style.display = '';
-  el.textContent = `Sesión: ~$${sesionCostoUSD.toFixed(3)} USD`;
-}
 
 const zona = document.getElementById('zona-drop');
 const fileInput = document.getElementById('file-input');
@@ -593,7 +581,6 @@ async function parsearChunk(chunkBuffer, chunkFile, chunkPageCount, intento = 0)
       return parsearChunk(chunkBuffer, chunkFile, chunkPageCount, intento + 1);
     }
     if (!d.ok && !d.incomplete) throw new Error(d.error);
-    registrarUso(d.uso);
     return d;
   } catch (e) {
     clearTimeout(timer);
