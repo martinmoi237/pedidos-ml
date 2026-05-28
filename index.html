@@ -173,6 +173,7 @@ const GRUPOS_CONFIG = [
 ];
 const GRUPO_ORDEN = { 'PECERA': 0, 'PRIMER PISO': 1, 'PLANTA BAJA': 2, 'SUBSUELO': 3 };
 const SKU_ALIAS = { 'CCBOXERP3': 'CC120500P3' };
+const SKU_TALLE_VARIANTS = new Set(['PALUMBAR']);
 
 const zona = document.getElementById('zona-drop');
 const fileInput = document.getElementById('file-input');
@@ -236,12 +237,13 @@ function procesarFilasRaw(rawFilas) {
     let packSize = pm ? parseInt(pm[1]) : 1;
     if (pm) base = base.slice(0, -pm[0].length).trim();
     // "P6.16" o "P6.P16" en varRaw → pack=6, talle=16
-    const pmPackDot = varRaw.match(/^P(\d+)\.P?(\d+)$/i);
+    const pmPackDot = varRaw.match(/^P(\d+)\.P?(.+)$/i);
     if (pmPackDot) { packSize = parseInt(pmPackDot[1]); varRaw = pmPackDot[2]; }
     // Variante puro sufijo de pack (ej: "P12") → absorber como packSize
     else { const pmVar = varRaw.match(/^P(\d+)$/i); if (pmVar) { packSize = parseInt(pmVar[1]); varRaw = ''; } }
 
-    const variante = formatVariante(varRaw);
+    const varFormatted = formatVariante(varRaw);
+    const variante = SKU_TALLE_VARIANTS.has(base.toUpperCase()) && /^\d+$/.test(varFormatted) ? 'TALLE ' + varFormatted : varFormatted;
     const key = base + '\t' + variante;
     acum.set(key, (acum.get(key) || 0) + (row.cant || 1) * packSize);
   }
