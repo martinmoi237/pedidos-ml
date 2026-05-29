@@ -211,8 +211,11 @@ function cancelarAnalisis() {
 function formatVariante(raw) {
   if (!raw) return '';
   raw = raw.replace(/AR$/i, '');
-  // Dígitos antes de letras = talle antes de color → poner color primero: 44AZUL → AZUL 44
-  raw = raw.replace(/^(\d+)([A-Za-z].*)$/, '$2 $1');
+  // Dígitos antes de letras = número antes de color → poner color primero: 44AZUL → AZUL 44
+  // Excepción: sufijos de talle (XL, 2XL, 3XL, 4XL…) no se reordenan
+  raw = raw.replace(/^(\d+)([A-Za-z].*)$/, (_, num, letters) =>
+    /^(XS|S|M|L|XL|XXL|XXXL|XXXXL)$/i.test(letters) ? num + letters : letters + ' ' + num
+  );
   // "T" antes de dígitos al final = Talle: NEGROT4 → NEGRO T4
   raw = raw.replace(/([A-Za-z])T(\d+)$/i, '$1 T$2');
   // Separar letras seguidas de dígito con espacio
