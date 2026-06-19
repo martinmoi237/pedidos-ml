@@ -183,7 +183,6 @@ const resultadoEl = document.getElementById('resultado');
 const tablasEl = document.getElementById('tablas');
 
 let gruposData = {};
-let modalCargando = false;
 // pdfSources: [{filename, buffer, pageCount, paginas}]
 let pdfSources = [];
 let filasActuales = [];
@@ -443,7 +442,7 @@ function moverRow(desde, hasta, i) {
   renderRows(hasta);
   switchTab(hasta);
 }
-function addRow(g) { if (modalCargando) return; if (!gruposData[g]) gruposData[g] = []; gruposData[g].push({ sku: '', mult: '', div: '', label: '', omitir: '', prefix: '', obs: '' }); renderRows(g); document.getElementById('rows-' + g).lastElementChild?.querySelector('.inp-sku')?.focus(); }
+function addRow(g) { if (!gruposData[g]) gruposData[g] = []; gruposData[g].push({ sku: '', mult: '', div: '', label: '', omitir: '', prefix: '', obs: '' }); renderRows(g); document.getElementById('rows-' + g).lastElementChild?.querySelector('.inp-sku')?.focus(); }
 function removeRow(g, i) { gruposData[g].splice(i, 1); renderRows(g); }
 function esc(s) { return (s || '').replace(/"/g, '&quot;'); }
 
@@ -452,21 +451,10 @@ async function abrirModal() {
   document.getElementById('modal-msg').className = 'msg';
   document.getElementById('sku-search-input').value = '';
   document.getElementById('sku-search-result').innerHTML = '';
-  modalCargando = true;
   resetModalPos();
   document.getElementById('modal-overlay').classList.add('open');
   buildModal();
-  document.getElementById('btn-guardar').disabled = true;
-  document.getElementById('btn-guardar').textContent = 'Cargando…';
-  try {
-    const res = await fetch('/api/grupos-get');
-    const data = await res.json();
-    if (data.ok) gruposData = migrateGrupos(data.grupos);
-  } catch(e) {}
   GRUPOS_CONFIG.forEach(g => renderRows(g.id));
-  document.getElementById('btn-guardar').disabled = false;
-  document.getElementById('btn-guardar').textContent = 'Guardar';
-  modalCargando = false;
 }
 
 function cerrarModal() {
