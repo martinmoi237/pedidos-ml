@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SKUs de Pedidos ML</title>
 <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; min-height: 100vh; padding: 32px 24px; color: #222; }
@@ -132,7 +133,7 @@ tfoot td { padding: 9px 16px; border-top: 2px solid #e8e8e8; font-weight: 600; c
   <div id="resultado">
     <div class="acciones">
       <button class="primary" onclick="copiarTabla()">Copiar tabla</button>
-      <button onclick="descargarXLS()">Descargar XLS</button>
+      <button onclick="descargarXLSX()">Descargar XLSX</button>
       <button class="success" id="btn-pdf" style="display:none" onclick="descargarPDF()">Descargar PDF ordenado</button>
     </div>
     <div id="tablas"></div>
@@ -794,46 +795,59 @@ async function descargarPDF() {
   } finally { btn.textContent = 'Descargar PDF ordenado'; btn.disabled = false; }
 }
 
-// ─── XLS ─────────────────────────────────────────────────────
-function descargarXLS() {
-  function ex(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+// ─── XLSX ────────────────────────────────────────────────────
+async function descargarXLSX() {
   const COLORES = {
-    'PECERA':'#FCE4EC','PRIMER PISO':'#E3F2FD','PLANTA BAJA':'#E8F5E9','SUBSUELO':'#FFF8E1','SIN ASIGNAR':'#F5F5F5'
+    'PECERA': 'FFFCE4EC', 'PRIMER PISO': 'FFE3F2FD',
+    'PLANTA BAJA': 'FFE8F5E9', 'SUBSUELO': 'FFFFF8E1', 'SIN ASIGNAR': 'FFF5F5F5'
   };
-  const BRD = '<Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders>';
-  const CTR = '<Alignment ss:Horizontal="Center" ss:Vertical="Center"/>';
-  let estilos = `<Styles><Style ss:ID="cell">${CTR}${BRD}</Style><Style ss:ID="th"><Font ss:Bold="1"/><Interior ss:Color="#EBEBEB" ss:Pattern="Solid"/>${CTR}${BRD}</Style>`;
-  GRUPOS_CONFIG.forEach((g, i) => {
-    const c = COLORES[g.label] || '#F0F0F0';
-    estilos += `<Style ss:ID="sec${i}"><Font ss:Bold="1" ss:Size="11"/><Interior ss:Color="${c}" ss:Pattern="Solid"/>${CTR}${BRD}</Style>`;
-  });
-  estilos += `<Style ss:ID="secSA"><Font ss:Bold="1" ss:Size="11"/><Interior ss:Color="#F5F5F5" ss:Pattern="Solid"/>${CTR}${BRD}</Style></Styles>`;
+  const brd = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+  const ctr = { horizontal:'center', vertical:'middle' };
 
-  let filas = '';
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Pedidos');
+  ws.columns = [{ width:22 }, { width:28 }, { width:16 }, { width:28 }];
+
   document.querySelectorAll('.seccion-grupo').forEach(sec => {
     const grupo = sec.querySelector('.seccion-grupo-header').textContent.trim();
-    const gi = GRUPOS_CONFIG.findIndex(g => g.label === grupo);
-    const sid = gi >= 0 ? `sec${gi}` : 'secSA';
-    filas += `<Row><Cell ss:StyleID="${sid}"><Data ss:Type="String">${ex(grupo)}</Data></Cell><Cell ss:StyleID="${sid}"/><Cell ss:StyleID="${sid}"/><Cell ss:StyleID="${sid}"/></Row>`;
-    filas += `<Row><Cell ss:StyleID="th"><Data ss:Type="String">SKU</Data></Cell><Cell ss:StyleID="th"><Data ss:Type="String">Variante</Data></Cell><Cell ss:StyleID="th"><Data ss:Type="String">Cant.</Data></Cell><Cell ss:StyleID="th"><Data ss:Type="String">Obs.</Data></Cell></Row>`;
-    sec.querySelectorAll('tbody tr').forEach(tr => {
-      const tds = [...tr.querySelectorAll('td')];
-      filas += `<Row>${[0,1,2,3].map(i=>`<Cell ss:StyleID="cell"><Data ss:Type="String">${ex(tds[i]?.textContent||'')}</Data></Cell>`).join('')}</Row>`;
+    const argb = COLORES[grupo] || 'FFF0F0F0';
+
+    const secRow = ws.addRow([grupo, '', '', '']);
+    secRow.eachCell({ includeEmpty: true }, cell => {
+      cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb } };
+      cell.font = { bold:true, size:11 };
+      cell.alignment = ctr;
+      cell.border = brd;
     });
-    filas += '<Row><Cell/></Row>';
+
+    const thRow = ws.addRow(['SKU', 'Variante', 'Cant.', 'Obs.']);
+    thRow.eachCell(cell => {
+      cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFEBEBEB' } };
+      cell.font = { bold:true };
+      cell.alignment = ctr;
+      cell.border = brd;
+    });
+
+    sec.querySelectorAll('tbody tr').forEach(tr => {
+      const row = ws.addRow([...tr.querySelectorAll('td')].map(td => td.textContent || ''));
+      row.eachCell({ includeEmpty: true }, cell => {
+        cell.alignment = ctr;
+        cell.border = brd;
+      });
+    });
+
+    ws.addRow([]);
   });
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">${estilos}<Worksheet ss:Name="Pedidos"><Table>${filas}</Table></Worksheet></Workbook>`;
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const now = new Date();
   const pad = n => String(n).padStart(2,'0');
   const ts = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
-  const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = `listita_${ts}.xls`;
+  a.href = URL.createObjectURL(blob);
+  a.download = `listita_${ts}.xlsx`;
   a.click();
-  URL.revokeObjectURL(url);
 }
 
 // ─── Copiar ───────────────────────────────────────────────────
