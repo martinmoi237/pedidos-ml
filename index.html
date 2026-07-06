@@ -226,7 +226,7 @@ function formatVariante(raw) {
   return raw.trim();
 }
 
-function procesarFilasRaw(rawFilas) {
+function procesarFilasRaw(rawFilas, skuMap) {
   const acum = new Map();
   for (const row of rawFilas) {
     let skuRaw = (row.sku || '').trim();
@@ -236,6 +236,20 @@ function procesarFilasRaw(rawFilas) {
     const sepIdx = skuRaw.search(/[.\-]/);
     let base = sepIdx > -1 ? skuRaw.slice(0, sepIdx) : skuRaw;
     let varRaw = sepIdx > -1 ? skuRaw.slice(sepIdx + 1) : (row.variante || '');
+
+    // Corregir base cuando Claude lo truncó a 8 chars y dejó letras en la variante
+    // Ej: "PABOMB16BE.8" leído como "PABOMB16.BE8" → base="PABOMB16", varRaw="BE8"
+    // Si base no está en el mapa pero base+letrasIniciales(varRaw) sí, extender base
+    if (skuMap && varRaw) {
+      const b = base.toUpperCase();
+      if (!skuMap.has(b)) {
+        const m = varRaw.match(/^([A-Za-z]+)/);
+        if (m && skuMap.has((b + m[1]).toUpperCase())) {
+          base = b + m[1];
+          varRaw = varRaw.slice(m[1].length);
+        }
+      }
+    }
 
     const pm = base.match(/P(\d+)$/i);
     let packSize = pm ? parseInt(pm[1]) : 1;
@@ -336,6 +350,12 @@ function lookupSku(skuMap, base, variante) {
     const combinedFull = (b + variante.replace(/\s+/g, '')).toUpperCase();
     const combinedSinPack = combinedFull.replace(/P\d+$/i, '');
     if (combinedSinPack !== combinedFull && skuMap.has(combinedSinPack)) return skuMap.get(combinedSinPack);
+  }
+  // Fallback: base truncado con letras de la variante perteneciendo al SKU real
+  // Ej: base="PABOMB16", variante="8 BE" → letras="BE" → "PABOMB16BE" en el mapa
+  if (variante) {
+    const letrasVar = variante.replace(/[\s\d]+/g, '').toUpperCase();
+    if (letrasVar && skuMap.has(b + letrasVar)) return skuMap.get(b + letrasVar);
   }
   return null;
 }
@@ -669,7 +689,7 @@ async function procesarArchivos(files) {
     src.paginas.forEach(p => todasLasPaginas.push({ ...p, srcIdx }));
   });
 
-  filasActuales = procesarFilasRaw(pdfSources.flatMap(r => r.filas));
+  filasActuales = procesarFilasRaw(pdfSources.flatMap(r => r.filas), buildSkuMap());
 
   mostrarResumen(pdfSources, todasLasPaginas);
   mostrarTabla(filasActuales);

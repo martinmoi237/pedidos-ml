@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 
 function buildPrompt(pageCount, skusConocidos) {
   const skuRef = skusConocidos && skusConocidos.length
-    ? `\n## REFERENCIA DE SKUs VÁLIDOS\nEstos son los SKUs reales del catálogo. Cuando dudes entre caracteres similares (O/0, B/8, etc.), buscá si el código leído coincide con alguno de esta lista. Si difiere en 1-2 caracteres por confusión visual, USÁ EL DE LA LISTA:\n${skusConocidos.join(', ')}\n`
+    ? `\n## REFERENCIA DE SKUs VÁLIDOS\nEstos son los SKUs reales del catálogo. Cuando leas el texto antes del punto/guion, buscá si coincide exactamente con alguno de esta lista y usalo como BASE. Esta lista es autoritativa para: (a) resolver caracteres similares (O/0, B/8, etc.) y (b) determinar el largo exacto del BASE — si el SKU de la lista tiene 10 caracteres, el BASE tiene 10. Si difiere en 1-2 caracteres, USÁ EL DE LA LISTA:\n${skusConocidos.join(', ')}\n`
     : '';
 
   return `Analizá este PDF de etiquetas de MercadoLibre Argentina.
@@ -17,7 +17,7 @@ ${skuRef}
 Para cada etiqueta, identificá el/los SKU(s) y su cantidad:
 - CRÍTICO: el SKU está SIEMPRE precedido por la palabra "SKU:" en la etiqueta. Buscá esa etiqueta específicamente. Todo lo demás (Nombre del comprador, Descripción del producto, Color:, Talle:, Pack Id:, Nombre:, etc.) NO es el SKU. Si no encontrás el campo "SKU:" en la página, devolvé sku="" para esa página.
 - El SKU tiene formato BASE.VARIANTE o BASE-VARIANTE. Devolvé siempre con punto como separador. El campo "sku" debe contener el código COMPLETO incluyendo punto y variante (ej: "OMFRAN02.39"). El campo "variante" en el JSON es SIEMPRE string vacío "".
-- El BASE es todo lo que está antes del punto/guion. La MAYORÍA de los BASE tienen exactamente 8 caracteres (ej: OMPISF02, FNAPOLO0, EO073000, OMFRAN02, CO808004). Si tu BASE tiene 7 o 9 caracteres, revisá bien — probablemente te falta o sobra un carácter.
+- El BASE es todo lo que está antes del punto/guion. La MAYORÍA de los BASE tienen exactamente 8 caracteres (ej: OMPISF02, FNAPOLO0, EO073000, OMFRAN02, CO808004), pero algunos tienen más (ej: 10 caracteres como PABOMB16BE). CRÍTICO: si tenés lista de SKUs válidos, buscá el texto antes del punto/guion en esa lista — el largo exacto del BASE es el que coincide con el SKU de la lista, sin importar cuántos caracteres tenga. NO ajustes el largo del BASE para que quede en 8 si el SKU completo aparece en la lista con otro largo. Si tu BASE tiene 7 o 9 caracteres Y no coincide con ningún SKU de la lista, revisá bien — probablemente te falta o sobra un carácter.
 - CRÍTICO — caracteres similares, prestalés máxima atención:
   * O (letra) vs 0 (cero): O es redonda y cerrada, 0 tiene barra diagonal. En palabras españolas (POLO, MEDIA, BOTA, FRANELA, etc.) son letras O. En secuencias numéricas son ceros. Ej: EO0102B0 tiene letras E,O y luego dígitos 0,1,0,2,B,0.
   * B (letra) vs 0 (cero): B tiene palo vertical izquierdo con dos protuberancias. 0 es un óvalo con barra. En EO0102B0 la B es una letra, no un cero.
