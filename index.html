@@ -832,6 +832,17 @@ async function descargarXLSX() {
     const grupo = sec.querySelector('.seccion-grupo-header').textContent.trim();
     const argb = COLORES[grupo] || 'FFF0F0F0';
 
+    if (grupo === 'SUBSUELO') {
+      const matiasRow = ws.addRow(['PEDIDO DE MATIAS', '', '', '']);
+      matiasRow.eachCell({ includeEmpty: true }, cell => {
+        cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFF0000' } };
+        cell.font = { bold:true, size:13, color:{ argb:'FFFFFFFF' } };
+        cell.alignment = ctr;
+        cell.border = brd;
+      });
+      ws.addRow([]);
+    }
+
     const secRow = ws.addRow([grupo, '', '', '']);
     secRow.eachCell({ includeEmpty: true }, cell => {
       cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb } };
