@@ -24,7 +24,8 @@ Para cada etiqueta, identificá el/los SKU(s) y su cantidad:
   * B (letra) vs 8 (dígito): B tiene palo izquierdo recto. 8 es simétrico sin palo. En CO808004 los 8 son dígitos.
   * NO agregues ni quites caracteres. Copiá exactamente lo que ves. EO073000 son 8 caracteres, no 9.
   * NO inventes separadores. Si no hay punto ni guion visible, devolvé el código completo sin separador.
-- La cantidad es el número que dice la etiqueta ("X Unidades"), o 1 si no especifica.
+- La cantidad es el número que dice la etiqueta ("X Unidades"), o 1 si no especifica. CRÍTICO: la cantidad NUNCA proviene del código SKU — los números dentro del SKU (ej: "407600" en "BP407600") NO son la cantidad. Si no dice "X Unidades" explícitamente, cant=1.
+- Los sufijos de pack son CORTOS: P3, P6, P12, P24 — un número de 1 o 2 dígitos después de "P". Si ves "P407600" o similar con muchos dígitos, NO es un pack, es parte del código SKU base.
 - NO multipliques por el sufijo de pack — devolvé la cantidad cruda.
 - Si hay múltiples SKUs en la página, listá TODOS con cantidad 1 cada uno.
 - Agrupá SKUs idénticos sumando cantidades.
