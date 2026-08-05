@@ -1,7 +1,7 @@
-export default async () => {
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' }
-  });
+export const handler = async () => {
+  return {
+    statusCode: 200,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ok: true })
+  };
 };
-export const config = { path: '/api/ping' };
