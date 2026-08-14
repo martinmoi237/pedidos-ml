@@ -175,6 +175,7 @@ const GRUPOS_CONFIG = [
 const GRUPO_ORDEN = { 'PECERA': 0, 'PRIMER PISO': 1, 'PLANTA BAJA': 2, 'SUBSUELO': 3 };
 const SKU_ALIAS = { 'CCBOXERP3': 'CC120500P3' };
 const SKU_TALLE_VARIANTS = new Set(['PALUMBAR']);
+const SKU_AL_FINAL = new Set(['OMBOTA02']);
 
 const zona = document.getElementById('zona-drop');
 const fileInput = document.getElementById('file-input');
@@ -745,14 +746,18 @@ function mostrarTabla(filas) {
   GRUPOS_CONFIG.forEach(g => { porGrupo[g.label] = []; });
   porGrupo['SIN ASIGNAR'] = [];
 
+  const alFinal = [];
   for (const fila of filas) {
     const cfg = lookupSku(skuMap, fila.sku, fila.variante);
     const grupo = cfg ? cfg.grupo : 'SIN ASIGNAR';
-    porGrupo[grupo].push({ ...fila, cfg: cfg || null });
+    if (SKU_AL_FINAL.has(fila.sku.toUpperCase())) {
+      alFinal.push({ ...fila, cfg: cfg || null, grupo });
+    } else {
+      porGrupo[grupo].push({ ...fila, cfg: cfg || null });
+    }
   }
 
-  [...GRUPOS_CONFIG.map(g => g.label), 'SIN ASIGNAR'].forEach(label => {
-    const items = porGrupo[label];
+  const renderSeccion = (label, items) => {
     if (!items || items.length === 0) return;
     const cls = label.replace(/\s+/g, '');
     const div = document.createElement('div');
@@ -764,7 +769,16 @@ function mostrarTabla(filas) {
         <tbody>${items.map(r => `<tr><td>${r.sku}</td><td>${displayVariante(r.variante, r.cfg)}</td><td>${formatCant(r.cant, r.cfg)}</td><td>${r.cfg?.obs||''}</td></tr>`).join('')}</tbody>
       </table>`;
     tablasEl.appendChild(div);
-  });
+  };
+
+  [...GRUPOS_CONFIG.map(g => g.label), 'SIN ASIGNAR'].forEach(label => renderSeccion(label, porGrupo[label]));
+
+  // SKU_AL_FINAL: renderizar al final de todo, agrupados por su grupo original
+  if (alFinal.length > 0) {
+    const porGrupoFinal = {};
+    alFinal.forEach(r => { (porGrupoFinal[r.grupo] = porGrupoFinal[r.grupo] || []).push(r); });
+    Object.entries(porGrupoFinal).forEach(([label, items]) => renderSeccion(label, items));
+  }
 
   resultadoEl.style.display = 'block';
 }
