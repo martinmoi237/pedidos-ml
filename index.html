@@ -844,7 +844,7 @@ async function descargarXLSX() {
       const matiasRow = ws.addRow(['PEDIDO DE MATIAS', '', '', '']);
       matiasRow.eachCell({ includeEmpty: true }, cell => {
         cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFF0000' } };
-        cell.font = { bold:true, size:13, color:{ argb:'FFFFFFFF' } };
+        cell.font = { bold:true, size:17, color:{ argb:'FFFFFFFF' } };
         cell.alignment = ctr;
         cell.border = brd;
       });
@@ -854,7 +854,7 @@ async function descargarXLSX() {
     const secRow = ws.addRow([grupo, '', '', '']);
     secRow.eachCell({ includeEmpty: true }, cell => {
       cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb } };
-      cell.font = { bold:true, size:11 };
+      cell.font = { bold:true, size:15 };
       cell.alignment = ctr;
       cell.border = brd;
     });
@@ -862,7 +862,7 @@ async function descargarXLSX() {
     const thRow = ws.addRow(['SKU', 'Variante', 'Cant.', 'Obs.']);
     thRow.eachCell(cell => {
       cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFEBEBEB' } };
-      cell.font = { bold:true };
+      cell.font = { bold:true, size:15 };
       cell.alignment = ctr;
       cell.border = brd;
     });
@@ -870,6 +870,7 @@ async function descargarXLSX() {
     sec.querySelectorAll('tbody tr').forEach(tr => {
       const row = ws.addRow([...tr.querySelectorAll('td')].map(td => td.textContent || ''));
       row.eachCell({ includeEmpty: true }, cell => {
+        cell.font = { size:15 };
         cell.alignment = ctr;
         cell.border = brd;
       });
