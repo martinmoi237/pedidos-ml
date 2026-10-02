@@ -213,6 +213,10 @@ function cancelarAnalisis() {
 function formatVariante(raw) {
   if (!raw) return '';
   raw = raw.replace(/AR$/i, '');
+  // Rango de edad/talle: "0A3" → "0-3", "3A6" → "3-6"
+  raw = raw.replace(/(\d+)A(\d+)/gi, '$1-$2');
+  // "TALLE 0-3" → "0-3" (rango de edad, sin prefijo)
+  raw = raw.replace(/^TALLE\s*(\d+-\d+)$/i, '$1');
   // Dígitos antes de letras = número antes de color → poner color primero: 44AZUL → AZUL 44
   // Excepción: sufijos de talle (XL, 2XL, 3XL, 4XL…) no se reordenan
   raw = raw.replace(/^(\d+)([A-Za-z].*)$/, (_, num, letters) =>
@@ -362,11 +366,11 @@ function lookupSku(skuMap, base, variante) {
 }
 
 function formatCant(count, cfg) {
-  if (!cfg || !cfg.label) return String(count);
-  const mult = parseInt(cfg.mult) || 1;
-  const divisor = parseInt(cfg.div) || 1;
+  const mult = cfg ? (parseInt(cfg.mult) || 1) : 1;
+  const divisor = cfg ? (parseInt(cfg.div) || 1) : 1;
   const total = count * mult;
   const n = divisor > 1 ? Math.round(total / divisor) : total;
+  if (!cfg || !cfg.label) return String(n);
   const labelUp = cfg.label.trim().toUpperCase();
   const labelL = labelUp.toLowerCase();
   let singular, plural;
