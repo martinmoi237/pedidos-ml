@@ -1,7 +1,8 @@
 export default async (request, context) => {
   const user = Deno.env.get('SITE_USER');
   const pass = Deno.env.get('SITE_PASS');
-  if (!user || !pass) return context.next();
+  // Sin credenciales configuradas, cerrar (no abrir el sitio a cualquiera)
+  if (!user || !pass) return new Response('Sitio no configurado: faltan SITE_USER / SITE_PASS', { status: 503 });
 
   const auth = request.headers.get('Authorization') || '';
   if (auth.startsWith('Basic ')) {
